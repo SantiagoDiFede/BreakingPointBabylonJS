@@ -1,0 +1,21 @@
+<html>
+<head>
+    <title>tp1 BabylonJS</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="css/default.css">
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
+    <script>
+        // Force Havok à trouver son .wasm au bon endroit
+        var HavokPhysicsWasm = { locateFile: (path) => `https://cdn.babylonjs.com/havok/${path}` };
+    </script>
+
+    <!-- Ton script SANS type="module" -->
+     <script src="js/enemy.js"></script>
+    <script src="js/main.js"></script>
+</head>
+<body>
+    <canvas id="myCanvas" width="1600" height="1200"></canvas>
+    <div id="crosshair"></div>
+</body>
+</html>
