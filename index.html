@@ -1,22 +1,89 @@
 <html>
 <head>
-    <title>tp1 BabylonJS</title>
+    <title>BreakingPoint - Roguelike FPS</title>
     <meta charset="UTF-8">
+    <meta name="description" content="BreakingPoint - A first-person roguelike FPS with procedural rooms">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/default.css">
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
     <script>
-        // Force Havok à trouver son .wasm au bon endroit
-        var HavokPhysicsWasm = { locateFile: (path) => `https://cdn.babylonjs.com/havok/${path}` };
+        var HavokPhysicsWasm = { locateFile: function(path) { return "https://cdn.babylonjs.com/havok/" + path; } };
     </script>
-
-    <!-- Ton script SANS type="module" -->
-     <script src="js/enemy.js"></script>
-     <script src="js/room.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/room.js"></script>
+    <script src="js/mapData.js"></script>
+    <script src="js/mapManager.js"></script>
     <script src="js/main.js"></script>
 </head>
 <body>
-    <canvas id="myCanvas" width="1600" height="1200"></canvas>
-    <div id="crosshair"></div>
+
+    <!-- MAIN MENU -->
+    <div id="main-menu">
+        <div id="menu-bg-particles"></div>
+        <div id="menu-content">
+            <div id="menu-logo">
+                <span class="logo-breaking">BREAKING</span>
+                <span class="logo-point">POINT</span>
+            </div>
+            <div id="menu-subtitle">ROGUELIKE · FIRST PERSON SHOOTER</div>
+            <div id="menu-buttons">
+                <button id="btn-play" class="menu-btn primary-btn" onclick="startGameFromMenu()">
+                    <span class="btn-icon">▶</span>
+                    <span class="btn-text">JOUER</span>
+                </button>
+                <button id="btn-controls" class="menu-btn secondary-btn" onclick="toggleControls()">
+                    <span class="btn-icon">⌨</span>
+                    <span class="btn-text">CONTRÔLES</span>
+                </button>
+                <button id="btn-quit" class="menu-btn danger-btn" onclick="quitGame()">
+                    <span class="btn-icon">✕</span>
+                    <span class="btn-text">QUITTER</span>
+                </button>
+            </div>
+            <div id="controls-panel" class="hidden">
+                <h3>CONTRÔLES</h3>
+                <div class="controls-grid">
+                    <span class="key">Z / W</span><span class="ctrl-desc">Avancer</span>
+                    <span class="key">S</span><span class="ctrl-desc">Reculer</span>
+                    <span class="key">Q / A</span><span class="ctrl-desc">Gauche</span>
+                    <span class="key">D</span><span class="ctrl-desc">Droite</span>
+                    <span class="key">ESPACE</span><span class="ctrl-desc">Sauter</span>
+                    <span class="key">SHIFT</span><span class="ctrl-desc">Sprint</span>
+                    <span class="key">CLIC</span><span class="ctrl-desc">Tirer</span>
+                    <span class="key">E</span><span class="ctrl-desc">Coup de pied</span>
+                    <span class="key">ESC</span><span class="ctrl-desc">Menu</span>
+                </div>
+            </div>
+            <div id="menu-version">v0.1.0 — 10 MAPS · 4 TYPES D'ENNEMIS</div>
+        </div>
+    </div>
+
+    <!-- GAME -->
+    <canvas id="myCanvas"></canvas>
+    <div id="crosshair" class="hidden"></div>
+    <div id="hud" class="hidden">
+        <div id="hud-map-label">MAP</div>
+        <div id="hud-map">-</div>
+        <div id="hud-rooms-label">SALLES</div>
+        <div id="hud-rooms">0 / 0</div>
+    </div>
+
+    <!-- PAUSE MENU -->
+    <div id="pause-menu" class="hidden">
+        <div id="pause-content">
+            <div id="pause-title">PAUSE</div>
+            <button class="menu-btn primary-btn" onclick="resumeGame()">
+                <span class="btn-icon">▶</span>
+                <span class="btn-text">REPRENDRE</span>
+            </button>
+            <button class="menu-btn danger-btn" onclick="returnToMenu()">
+                <span class="btn-icon">⌂</span>
+                <span class="btn-text">MENU PRINCIPAL</span>
+            </button>
+        </div>
+    </div>
+
 </body>
 </html>
