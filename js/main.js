@@ -31,8 +31,7 @@
 
         // ✅ Havok physics
         const hk = new BABYLON.HavokPlugin(true, havokInstance);
-        scene.enablePhysics(new BABYLON.Vector3(0, -9.81, 0), hk);
-
+        scene.enablePhysics(new BABYLON.Vector3(0, -25, 0), hk);
         // --------------------
         // GROUND
         // --------------------
@@ -65,26 +64,22 @@
 
         playerMesh.isVisible = false;
 
-        // ✅ PhysicsAggregate (dynamic)
         playerAggregate = new BABYLON.PhysicsAggregate(
             playerMesh,
             BABYLON.PhysicsShapeType.CAPSULE,
-            { mass: 1, restitution: 0, friction: 1 },
+            { mass: 1, restitution: 0, friction: 0 }, // friction: 0 — let us control sliding
             scene
         );
 
         const body = playerAggregate.body;
 
-        // Prevent tipping over
         body.setAngularDamping(100);
         body.setMassProperties({
             mass: 1,
-            inertia: new BABYLON.Vector3(0, 0, 0)  // ← empêche le basculement
+            inertia: new BABYLON.Vector3(0, 0, 0)
         });
 
-        // Smooth movement
-        body.setLinearDamping(0.9);
-
+        body.setLinearDamping(0); // ← no drag, we handle deceleration manually
         // --------------------
         // ENEMY
         // --------------------
@@ -117,13 +112,23 @@
 
             const hit = scene.pickWithRay(ray);
 
-            if (hit.pickedMesh && hit.pickedMesh.name === "enemy") {
+            // ---------- hit effect ----------
+
+            spawnHitDecal(hit.pickedPoint, hit.getNormal(true), hit.pickedMesh);
+            
+            if (hit.pickedMesh.name === "enemy") {
                 const forceDirection = ray.direction.normalize();
 
-                hit.pickedMesh.PhysicsAggregate.applyImpulse(
-                    forceDirection.scale(15),
-                    hit.pickedPoint
-                );
+                const knockback = new BABYLON.Vector3(
+                    forceDirection.x,
+                    0,
+                    forceDirection.z
+                ).normalize().scale(4);
+
+                const body = hit.pickedMesh.physicsAggregate.body;
+
+               body.setLinearVelocity(new BABYLON.Vector3(0, 0.001, 0));
+                body.applyImpulse(knockback, hit.pickedMesh.getAbsolutePosition());
             }
         }
 
@@ -133,20 +138,7 @@
         window.addEventListener("keydown", (e) => inputMap[e.key.toLowerCase()] = true);
         window.addEventListener("keyup", (e) => inputMap[e.key.toLowerCase()] = false);
 
-        // Jump
-        window.addEventListener("keydown", (e) => {
-            if (e.code === "Space") {
-                const velocity = body.getLinearVelocity();
 
-                // Simple grounded check
-                if (Math.abs(velocity.y) < 0.05) {
-                    body.applyImpulse(
-                        new BABYLON.Vector3(0, 5, 0),
-                        playerMesh.getAbsolutePosition()
-                    );
-                }
-            }
-        });
 
         // Pointer lock
         canvas.addEventListener("click", () => canvas.requestPointerLock());
@@ -159,38 +151,94 @@
         );
         light.intensity = 0.6;
 
-        // --------------------
-        // MOVEMENT LOOP
-        // --------------------
-        scene.onBeforeRenderObservable.add(() => {
-            let moveDir = BABYLON.Vector3.Zero();
 
+        // --------------------
+        // DOUBLE JUMP  (single listener — replaces both old Space listeners)
+        // --------------------
+        let jumpCount = 0;
+        const maxJumps = 2;
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space") {
+                const velocity = body.getLinearVelocity();
+                const isGrounded = Math.abs(velocity.y) < 0.15;
+
+                if (isGrounded) jumpCount = 0;
+
+                if (jumpCount < maxJumps) {
+                    if (jumpCount > 0) {
+                        // Snap vertical velocity to zero for a snappy double-jump
+                        body.setLinearVelocity(
+                            new BABYLON.Vector3(velocity.x, 0, velocity.z)
+                        );
+                    }
+                    body.applyImpulse(new BABYLON.Vector3(0, 9, 0), playerMesh.getAbsolutePosition());
+                    jumpCount++;
+                }
+            }
+        });
+
+        // --------------------
+        // MOVEMENT LOOP  (Quake-style acceleration → preserves momentum)
+        // --------------------
+        const MAX_SPEED    = 14;
+        const SPRINT_SPEED = 22;
+        const ACCEL        = 120;
+        const AIR_ACCEL    = 55;
+        const FRICTION     = 18;
+
+        scene.onBeforeRenderObservable.add(() => {
+            const dt = engine.getDeltaTime() / 1000;
+            const velocity = body.getLinearVelocity();
+            const isGrounded = Math.abs(velocity.y) < 0.15;
+
+            let moveDir = BABYLON.Vector3.Zero();
             if (inputMap["z"] || inputMap["w"]) moveDir.z += 1;
-            if (inputMap["s"]) moveDir.z -= 1;
+            if (inputMap["s"])                  moveDir.z -= 1;
             if (inputMap["q"] || inputMap["a"]) moveDir.x -= 1;
-            if (inputMap["d"]) moveDir.x += 1;
+            if (inputMap["d"])                  moveDir.x += 1;
+
+            const wishSpeed = inputMap["shift"] ? SPRINT_SPEED : MAX_SPEED;
 
             if (!moveDir.equals(BABYLON.Vector3.Zero())) {
                 moveDir.normalize();
-
                 const forward = camera.getDirection(BABYLON.Axis.Z);
-                const right = camera.getDirection(BABYLON.Axis.X);
+                const right   = camera.getDirection(BABYLON.Axis.X);
 
                 const wishDir = forward.scale(moveDir.z).add(right.scale(moveDir.x));
                 wishDir.y = 0;
                 wishDir.normalize();
 
-                const speed = inputMap["shift"] ? 10 : 6;
+                // Quake-style additive acceleration: only add velocity in the wish direction
+                // if we're not already at/past max speed in that direction
+                const currentHorizontal = new BABYLON.Vector3(velocity.x, 0, velocity.z);
+                const projectedSpeed = BABYLON.Vector3.Dot(currentHorizontal, wishDir);
+                const addSpeed = wishSpeed - projectedSpeed;
 
-                const currentVelocity = body.getLinearVelocity();
+                if (addSpeed > 0) {
+                    const accel = isGrounded ? ACCEL : AIR_ACCEL;
+                    const accelAmount = Math.min(accel * dt * wishSpeed, addSpeed);
+                    const accelVec = wishDir.scale(accelAmount);
 
-                body.setLinearVelocity(
-                    new BABYLON.Vector3(
-                        wishDir.x * speed,
-                        currentVelocity.y,
-                        wishDir.z * speed
-                    )
-                );
+                    body.setLinearVelocity(new BABYLON.Vector3(
+                        velocity.x + accelVec.x,
+                        velocity.y,
+                        velocity.z + accelVec.z
+                    ));
+                }
+            } else if (isGrounded) {
+                // Apply friction when grounded and no input
+                const hVel = new BABYLON.Vector3(velocity.x, 0, velocity.z);
+                const speed = hVel.length();
+                if (speed > 0) {
+                    const drop = speed * FRICTION * dt;
+                    const newSpeed = Math.max(speed - drop, 0) / speed;
+                    body.setLinearVelocity(new BABYLON.Vector3(
+                        velocity.x * newSpeed,
+                        velocity.y,
+                        velocity.z * newSpeed
+                    ));
+                }
             }
         });
 
