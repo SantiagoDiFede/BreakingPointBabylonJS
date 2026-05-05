@@ -1,9 +1,11 @@
+
+
 // Enemy type definitions - now with model paths
 var ENEMY_TYPES = {
     box: {
         name: "Box", 
         size: 2, 
-        modelPath: "../models/G-R5.glb",  // Path to your .glb file
+        modelPath: "/models/rob1.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 1, g: 0, b: 0 },
         mass: 1, restitution: 0.5, friction: 0.5,
@@ -12,7 +14,7 @@ var ENEMY_TYPES = {
     sphere: {
         name: "Sphere", 
         size: 2.5, 
-        modelPath: "../models/G-R5.glb",  // Reusing the same model for simplicity
+        modelPath: "/models/rob1.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 0.8, g: 0, b: 0.8 },
         mass: 0.8, restitution: 0.7, friction: 0.3,
@@ -21,7 +23,7 @@ var ENEMY_TYPES = {
     fast_box: {
         name: "Fast Box", 
         size: 1.5, 
-        modelPath: "../models/G-R5.glb",  // Reusing the same model for simplicity
+        modelPath: "/models/rob1.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 1, g: 0.5, b: 0 },
         mass: 0.7, restitution: 0.3, friction: 0.5,
@@ -30,7 +32,7 @@ var ENEMY_TYPES = {
     tank: {
         name: "Tank", 
         size: 3, 
-        modelPath: "../models/G-R5.glb",  // Reusing the same model for simplicity
+        modelPath: "/models/rob1.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 0.3, g: 0.3, b: 1 },
         mass: 3, restitution: 0.2, friction: 0.8,
@@ -51,57 +53,49 @@ function createEnemy(scene, ground, playerMesh, position, type) {
     }
 }
 
-function loadEnemyModel(scene, config, position, playerMesh) {
-    var enemy = null;
-    
-    BABYLON.SceneLoader.ImportMeshAsync(
-        "",  // Import all meshes
-        "",  // Root URL
-        config.modelPath,
-        scene
-    ).then(function(result) {
-        if (result.meshes && result.meshes.length > 0) {
-            enemy = result.meshes[0]; // Use first mesh as the main body
-            
-            // Parent all other meshes to the root
-            for (let i = 1; i < result.meshes.length; i++) {
-                result.meshes[i].parent = enemy;
-            }
-            
-            // Set position
-            if (position) {
-                if (position instanceof BABYLON.Vector3) {
-                    enemy.position = position;
-                } else {
-                    enemy.position = new BABYLON.Vector3(position.x, position.y, position.z);
-                }
-            } else {
-                enemy.position = new BABYLON.Vector3(5, 1, 5);
-            }
-            
-            // Setup physics
-            setupEnemyPhysics(scene, enemy, config);
-            
-            // Interaction handler for kicking
-            enemy.onInteract = function(pMesh) {
-                var dist = BABYLON.Vector3.Distance(pMesh.position, enemy.position);
-                if (dist < 3) {
-                    var dir = enemy.position.subtract(pMesh.position).normalize();
-                    var body = enemy.physicsAggregate.body;
-                    body.applyImpulse(dir.scale(10), enemy.getAbsolutePosition());
-                }
-            };
-            
-            // Store enemy type
-            enemy.enemyType = type;
-        }
-    }).catch(function(error) {
-        console.error("Failed to load enemy model: " + config.modelPath, error);
-        // Fallback to primitive shape if model loading fails
-        return createPrimitiveEnemy(scene, config, position, playerMesh);
-    });
-    
-    return enemy;
+async function loadEnemyModel(scene, config, position, playerMesh) {
+    try {
+        const result = await BABYLON.SceneLoader.ImportMeshAsync("", "", config.modelPath, scene);
+        const modelRoot = result.meshes[0];
+        
+        // 1. Create a "Physics Container" (the actual object that moves)
+        const physicsParent = new BABYLON.Mesh("enemy_container", scene);
+        physicsParent.position = position instanceof BABYLON.Vector3 ? 
+                                 position.clone() : 
+                                 new BABYLON.Vector3(position.x, 3, position.z);
+
+        // 2. Attach the model to our container
+        modelRoot.parent = physicsParent;
+
+        // 3. OFFSET: Lift the model inside the container
+        // If your model is 2 units tall, lifting it by 1 unit puts feet at the origin
+        modelRoot.position = new BABYLON.Vector3(0, config.size / 2, 0);
+        
+        // 4. FIX ROTATION: Flip the model if it's upside down
+        modelRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0); 
+
+        // 5. PHYSICS: Apply to the PARENT container
+        const geometryMeshes = result.meshes.filter(m => m.getTotalVertices() > 0);
+        const shape = new BABYLON.PhysicsShapeConvexHull(geometryMeshes[0], scene);
+        
+        const aggregate = new BABYLON.PhysicsAggregate(
+            physicsParent,
+            shape,
+            { mass: config.mass, restitution: config.restitution },
+            scene
+        );
+
+        physicsParent.physicsAggregate = aggregate;
+
+        // 6. Tagging for your shoot function
+        geometryMeshes.forEach(m => {
+            m.enemyRoot = physicsParent; 
+        });
+
+        return physicsParent;
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 function createPrimitiveEnemy(scene, config, position, playerMesh) {

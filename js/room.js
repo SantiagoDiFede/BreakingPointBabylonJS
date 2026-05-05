@@ -39,12 +39,16 @@ class Room {
 
         // Spawn enemies
         var self = this;
-        this.enemyData.forEach(function(data) {
+        this.enemyData.forEach(async (data) => { // Added async here
             var pos = (data.position instanceof BABYLON.Vector3)
                 ? data.position
                 : new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
-            var enemy = createEnemy(self.scene, floor, null, pos, data.type);
-            self.enemies.push(enemy);
+            
+            // Wait for the enemy to actually be created/loaded
+            var enemy = await createEnemy(this.scene, floor, null, pos, data.type);
+            if (enemy) {
+                this.enemies.push(enemy);
+            }
         });
     }
 

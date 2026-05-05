@@ -250,14 +250,20 @@ function _shoot(sc) {
     var ray = sc.createPickingRay(canvas.width / 2, canvas.height / 2, BABYLON.Matrix.Identity(), camera);
     var hit = sc.pickWithRay(ray);
     
-    if (hit.pickedMesh) {
-        // Spawn hit decal effect on any surface
+    if (hit.hit && hit.pickedMesh) {
         spawnHitDecal(hit.pickedPoint, hit.getNormal(true), hit.pickedMesh);
         
-        // Apply knockback if it's an enemy
-        if (hit.pickedMesh.name === "enemy" && hit.pickedMesh.physicsAggregate) {
-            hit.pickedMesh.physicsAggregate.body.applyImpulse(
-                ray.direction.normalize().scale(15), hit.pickedPoint
+        // Find the enemy root
+        let target = hit.pickedMesh.enemyRoot || (hit.pickedMesh.physicsAggregate ? hit.pickedMesh : null);
+        
+        if (target && target.physicsAggregate) {
+            // Wake up Havok
+            target.physicsAggregate.body.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
+            
+            // Strong impulse
+            target.physicsAggregate.body.applyImpulse(
+                ray.direction.scale(30), 
+                hit.pickedPoint
             );
         }
     }
