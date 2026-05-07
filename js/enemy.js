@@ -14,7 +14,7 @@ var ENEMY_TYPES = {
     sphere: {
         name: "Sphere", 
         size: 2.5, 
-        modelPath: "/models/rob1.glb",  // Path to your .glb file
+        modelPath: "/models/semiautobot.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 0.8, g: 0, b: 0.8 },
         mass: 0.8, restitution: 0.7, friction: 0.3,
@@ -23,7 +23,7 @@ var ENEMY_TYPES = {
     fast_box: {
         name: "Fast Box", 
         size: 1.5, 
-        modelPath: "/models/rob1.glb",  // Path to your .glb file
+        modelPath: "/models/speedbot.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 1, g: 0.5, b: 0 },
         mass: 0.7, restitution: 0.3, friction: 0.5,
@@ -32,7 +32,7 @@ var ENEMY_TYPES = {
     tank: {
         name: "Tank", 
         size: 3, 
-        modelPath: "/models/rob1.glb",  // Path to your .glb file
+        modelPath: "/models/tankbot.glb",  // Path to your .glb file
         useModel: true,
         color: { r: 0.3, g: 0.3, b: 1 },
         mass: 3, restitution: 0.2, friction: 0.8,
