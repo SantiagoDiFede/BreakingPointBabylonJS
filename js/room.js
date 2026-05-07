@@ -1,5 +1,5 @@
 class Room {
-    constructor(scene, width, depth, doorPositions, enemyData) {
+    constructor(scene, width, depth, doorPositions, enemyData, worldX, worldZ) {
         this.scene = scene;
         this.width = width;
         this.depth = depth;
@@ -9,15 +9,21 @@ class Room {
         this.physicsAggregates = [];
         this.enemies = [];
         this.roomId = -1;
+        // World offset — room center in world coordinates
+        this.worldX = worldX || 0;
+        this.worldZ = worldZ || 0;
     }
 
     create() {
+        var ox = this.worldX;
+        var oz = this.worldZ;
+
         // Floor
-        var floor = BABYLON.MeshBuilder.CreateBox("floor", {
+        var floor = BABYLON.MeshBuilder.CreateBox("floor_" + this.roomId, {
             width: this.width, height: 0.1, depth: this.depth
         }, this.scene);
-        floor.position.y = -0.05;
-        var floorMat = new BABYLON.StandardMaterial("floorMat", this.scene);
+        floor.position = new BABYLON.Vector3(ox, -0.05, oz);
+        var floorMat = new BABYLON.StandardMaterial("floorMat_" + this.roomId, this.scene);
         floorMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
         floor.material = floorMat;
         this.meshes.push(floor);
@@ -26,56 +32,71 @@ class Room {
             { mass: 0, restitution: 0, friction: 1 }, this.scene
         ));
 
-        // Walls
-        this._createWall("north", new BABYLON.Vector3(0, 2.5, this.depth / 2), this.width, 5, 0.5);
-        this._createWall("south", new BABYLON.Vector3(0, 2.5, -this.depth / 2), this.width, 5, 0.5);
-        this._createWall("east", new BABYLON.Vector3(this.width / 2, 2.5, 0), 0.5, 5, this.depth);
-        this._createWall("west", new BABYLON.Vector3(-this.width / 2, 2.5, 0), 0.5, 5, this.depth);
+        // Walls (offset by worldX, worldZ)
+        this._createWall("north", new BABYLON.Vector3(ox, 2.5, oz + this.depth / 2), this.width, ROOM_HEIGHT, WALL_THICKNESS);
+        this._createWall("south", new BABYLON.Vector3(ox, 2.5, oz - this.depth / 2), this.width, ROOM_HEIGHT, WALL_THICKNESS);
+        this._createWall("east",  new BABYLON.Vector3(ox + this.width / 2, 2.5, oz), WALL_THICKNESS, ROOM_HEIGHT, this.depth);
+        this._createWall("west",  new BABYLON.Vector3(ox - this.width / 2, 2.5, oz), WALL_THICKNESS, ROOM_HEIGHT, this.depth);
 
-        // Light
-        var light = new BABYLON.PointLight("roomLight", new BABYLON.Vector3(0, 4, 0), this.scene);
+        // Room light
+        var light = new BABYLON.PointLight("roomLight_" + this.roomId, new BABYLON.Vector3(ox, 4, oz), this.scene);
         light.intensity = 0.5;
         this.meshes.push(light);
 
-        // Spawn enemies
+        // Spawn enemies at world positions
         var self = this;
-        this.enemyData.forEach(async (data) => { // Added async here
-            var pos = (data.position instanceof BABYLON.Vector3)
-                ? data.position
-                : new BABYLON.Vector3(data.position.x, data.position.y, data.position.z);
-            
-            // Wait for the enemy to actually be created/loaded
-            var enemy = await createEnemy(this.scene, floor, null, pos, data.type);
+        this.enemyData.forEach(async function(data) {
+            var pos = new BABYLON.Vector3(
+                ox + data.position.x,
+                data.position.y,
+                oz + data.position.z
+            );
+            var enemy = await createEnemy(self.scene, null, null, pos, data.type);
             if (enemy) {
-                this.enemies.push(enemy);
+                self.enemies.push(enemy);
             }
         });
     }
 
     _createWall(direction, position, width, height, depth) {
         var hasDoor = this.doorPositions[direction];
-        if (hasDoor) {
-            var wallPartWidth  = (direction === "north" || direction === "south") ? (width - 4) / 2 : width;
-            var wallPartDepth  = (direction === "east"  || direction === "west")  ? (depth - 4) / 2 : depth;
+        var doorGap = 4; // width of the door opening
 
+        if (hasDoor) {
             if (direction === "north" || direction === "south") {
-                this._addWallSegment(direction + "_left",
-                    position.add(new BABYLON.Vector3(-(width / 2 - wallPartWidth / 2), 0, 0)),
-                    wallPartWidth, height, depth);
-                this._addWallSegment(direction + "_right",
-                    position.add(new BABYLON.Vector3(width / 2 - wallPartWidth / 2, 0, 0)),
-                    wallPartWidth, height, depth);
+                // Horizontal wall with a gap in the center
+                var wallPartWidth = (width - doorGap) / 2;
+                // Left segment
+                this._addWallSegment(
+                    direction + "_left_" + this.roomId,
+                    new BABYLON.Vector3(position.x - (width / 2 - wallPartWidth / 2), position.y, position.z),
+                    wallPartWidth, height, depth
+                );
+                // Right segment
+                this._addWallSegment(
+                    direction + "_right_" + this.roomId,
+                    new BABYLON.Vector3(position.x + (width / 2 - wallPartWidth / 2), position.y, position.z),
+                    wallPartWidth, height, depth
+                );
             } else {
-                this._addWallSegment(direction + "_top",
-                    position.add(new BABYLON.Vector3(0, 0, -(depth / 2 - wallPartDepth / 2))),
-                    width, height, wallPartDepth);
-                this._addWallSegment(direction + "_bottom",
-                    position.add(new BABYLON.Vector3(0, 0, depth / 2 - wallPartDepth / 2)),
-                    width, height, wallPartDepth);
+                // Vertical wall (east/west) with a gap in the center
+                var wallPartDepth = (depth - doorGap) / 2;
+                // Bottom segment (negative Z)
+                this._addWallSegment(
+                    direction + "_bot_" + this.roomId,
+                    new BABYLON.Vector3(position.x, position.y, position.z - (depth / 2 - wallPartDepth / 2)),
+                    width, height, wallPartDepth
+                );
+                // Top segment (positive Z)
+                this._addWallSegment(
+                    direction + "_top_" + this.roomId,
+                    new BABYLON.Vector3(position.x, position.y, position.z + (depth / 2 - wallPartDepth / 2)),
+                    width, height, wallPartDepth
+                );
             }
-            this._createDoorTrigger(direction, position);
         } else {
-            this._addWallSegment(direction, position, width, height, depth);
+            // Solid wall, no door
+            this._addWallSegment(direction + "_" + this.roomId, position, width, height, depth);
         }
     }
 
@@ -91,22 +112,6 @@ class Room {
             wall, BABYLON.PhysicsShapeType.BOX,
             { mass: 0, restitution: 0, friction: 1 }, this.scene
         ));
-    }
-
-    _createDoorTrigger(direction, position) {
-        var trigger = BABYLON.MeshBuilder.CreateBox("door_trigger_" + direction, {
-            width: (direction === "north" || direction === "south") ? 4 : 0.6,
-            height: 4,
-            depth: (direction === "east"  || direction === "west")  ? 4 : 0.6
-        }, this.scene);
-        trigger.position = new BABYLON.Vector3(position.x, 2, position.z);
-        trigger.visibility = 0.3;
-        var trigMat = new BABYLON.StandardMaterial("triggerMat_" + direction, this.scene);
-        trigMat.diffuseColor = new BABYLON.Color3(0, 1, 0);
-        trigger.material = trigMat;
-        trigger.isDoor = true;
-        trigger.doorDirection = direction;
-        this.meshes.push(trigger);
     }
 
     dispose() {

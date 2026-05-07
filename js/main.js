@@ -126,10 +126,13 @@ function createScene() {
     body.setMassProperties({ mass: 1, inertia: new BABYLON.Vector3(0, 0, 0) });
     body.setLinearDamping(0.9);
 
-    // ---------- MAP ----------
+    // ---------- MAP (build all rooms at once) ----------
     mapManager = new MapManager(sc);
     mapManager.initRandomMap();
-    _teleportPlayer(new BABYLON.Vector3(0, 2, 0));
+
+    // Spawn player at the start room's center
+    var spawnPos = mapManager.getSpawnPosition();
+    _teleportPlayer(spawnPos);
 
     // ---------- CAMERA ----------
     camera = new BABYLON.FreeCamera("fpsCamera", playerMesh.position.clone(), sc);
@@ -176,9 +179,6 @@ function createScene() {
     var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), sc);
     light.intensity = 0.3;
 
-    // ---------- DOOR TRANSITION COOLDOWN ----------
-    var cooldown = false;
-
     // ---------- GAME LOOP ----------
     sc.onBeforeRenderObservable.add(function() {
         if (gamePaused) return;
@@ -202,24 +202,8 @@ function createScene() {
             body.setLinearVelocity(new BABYLON.Vector3(wishDir.x * speed, cv.y, wishDir.z * speed));
         }
 
-        // Door detection
-        if (!cooldown) {
-            var room = mapManager.getCurrentRoom();
-            if (room) {
-                room.meshes.forEach(function(mesh) {
-                    if (mesh.isDoor) {
-                        var dist = BABYLON.Vector3.Distance(playerMesh.position, mesh.position);
-                        if (dist < 2.5) {
-                            cooldown = true;
-                            mapManager.transitionToRoom(mesh.doorDirection);
-                            _spawnPlayerFromDoor(mesh.doorDirection);
-                            _updateHUD();
-                            setTimeout(function() { cooldown = false; }, 800);
-                        }
-                    }
-                });
-            }
-        }
+        // Update HUD based on player position
+        _updateHUD();
     });
 
     return sc;
@@ -233,17 +217,6 @@ function _teleportPlayer(pos) {
     body.setLinearVelocity(BABYLON.Vector3.Zero());
     body.setTargetTransform(pos, BABYLON.Quaternion.Identity());
     playerMesh.position.copyFrom(pos);
-}
-
-function _spawnPlayerFromDoor(dir) {
-    var room = mapManager.getCurrentRoom();
-    var offset = 6;
-    var pos = new BABYLON.Vector3(0, 2, 0);
-    if (dir === "north") pos.z = -(room.depth / 2 - offset);
-    if (dir === "south") pos.z = (room.depth / 2 - offset);
-    if (dir === "east") pos.x = -(room.width / 2 - offset);
-    if (dir === "west") pos.x = (room.width / 2 - offset);
-    _teleportPlayer(pos);
 }
 
 function _shoot(sc) {
@@ -271,5 +244,5 @@ function _shoot(sc) {
 
 function _updateHUD() {
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
-    if (hudRooms) hudRooms.textContent = mapManager.getVisitedCount() + " / " + mapManager.getRoomCount();
+    if (hudRooms) hudRooms.textContent = mapManager.getCurrentRoomName();
 }
