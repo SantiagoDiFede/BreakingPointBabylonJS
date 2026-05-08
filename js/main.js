@@ -12,25 +12,28 @@ var inputMap = {};
 var hudMapName, hudRooms;
 var gameStarted = false;
 var gamePaused = false;
-var enemyUpdateInterval = 0;
-var cooldown = false;
 
 // ===========================
 // MENU STATE & FUNCTIONS
 // ===========================
-function startGameFromMenu() {
+async function startGameFromMenu() {
+    // Hide menu, show loading screen
     document.getElementById("main-menu").classList.add("hidden");
-    document.getElementById("myCanvas").classList.remove("hidden");
-    document.getElementById("crosshair").classList.remove("hidden");
-    document.getElementById("hud").classList.remove("hidden");
+    document.getElementById("loading-screen").classList.remove("hidden");
 
     if (!gameStarted) {
         gameStarted = true;
-        startGame();
+        await startGame();
     } else {
         // Already initialised – just resume
         if (engine) engine.runRenderLoop(function() { scene.render(); });
     }
+
+    // Hide loading screen, show game UI
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("myCanvas").classList.remove("hidden");
+    document.getElementById("crosshair").classList.remove("hidden");
+    document.getElementById("hud").classList.remove("hidden");
 }
 
 function toggleControls() {
@@ -99,6 +102,15 @@ async function startGame() {
     engine = new BABYLON.Engine(canvas, true);
     scene = createScene();
 
+    // We need to wait for the scene components to be ready
+    // Map building is async, but createScene itself is sync. 
+    // Let's refactor slightly to wait for mapManager.initRandomMap
+    await mapManager.initRandomMap();
+
+    // Spawn player at the start room's center
+    var spawnPos = mapManager.getSpawnPosition();
+    _teleportPlayer(spawnPos);
+
     engine.runRenderLoop(function() { scene.render(); });
     window.addEventListener("resize", function() { engine.resize(); });
 }
@@ -128,13 +140,9 @@ function createScene() {
     body.setMassProperties({ mass: 1, inertia: new BABYLON.Vector3(0, 0, 0) });
     body.setLinearDamping(0.9);
 
-    // ---------- MAP (build all rooms at once) ----------
+    // ---------- MAP MANAGER ----------
     mapManager = new MapManager(sc);
-    mapManager.initRandomMap();
-
-    // Spawn player at the start room's center
-    var spawnPos = mapManager.getSpawnPosition();
-    _teleportPlayer(spawnPos);
+    // (Note: initRandomMap is now called in startGame and awaited)
 
     // ---------- CAMERA ----------
     camera = new BABYLON.FreeCamera("fpsCamera", playerMesh.position.clone(), sc);
@@ -182,16 +190,16 @@ function createScene() {
     light.intensity = 0.3;
 
     // ---------- GAME LOOP ----------
-sc.onBeforeRenderObservable.add(function() {
+    sc.onBeforeRenderObservable.add(function() {
         if (gamePaused) return;
- 
+
         // Movement
         var moveDir = BABYLON.Vector3.Zero();
         if (inputMap["z"] || inputMap["w"]) moveDir.z += 1;
         if (inputMap["s"]) moveDir.z -= 1;
         if (inputMap["q"] || inputMap["a"]) moveDir.x -= 1;
         if (inputMap["d"]) moveDir.x += 1;
- 
+
         if (!moveDir.equals(BABYLON.Vector3.Zero())) {
             moveDir.normalize();
             var forward = camera.getDirection(BABYLON.Axis.Z);
@@ -204,29 +212,10 @@ sc.onBeforeRenderObservable.add(function() {
             body.setLinearVelocity(new BABYLON.Vector3(wishDir.x * speed, cv.y, wishDir.z * speed));
         }
 
-        // Update HUD based on player position
+        // Update HUD and lights based on player position
         _updateHUD();
- 
-        // Door detection
-        if (!cooldown) {
-            var room = mapManager.getCurrentRoom();
-            if (room) {
-                room.meshes.forEach(function(mesh) {
-                    if (mesh.isDoor) {
-                        var dist = BABYLON.Vector3.Distance(playerMesh.position, mesh.position);
-                        if (dist < 2.5) {
-                            cooldown = true;
-                            mapManager.transitionToRoom(mesh.doorDirection);
-                            _spawnPlayerFromDoor(mesh.doorDirection);
-                            _updateHUD();
-                            // ADDED: Clear projectiles when changing rooms
-                            clearProjectiles(sc);
-                            setTimeout(function() { cooldown = false; }, 800);
-                        }
-                    }
-                });
-            }
-        }
+        mapManager.updateProximityLights();
+
  
         // ADDED: Update enemy AI
         var deltaTime = engine.getDeltaTime() / 1000; // Convert to seconds
@@ -240,6 +229,7 @@ sc.onBeforeRenderObservable.add(function() {
 // HELPER FUNCTIONS
 // ===========================
 function _teleportPlayer(pos) {
+    if (!playerAggregate) return;
     var body = playerAggregate.body;
     body.setLinearVelocity(BABYLON.Vector3.Zero());
     body.setTargetTransform(pos, BABYLON.Quaternion.Identity());
@@ -251,7 +241,6 @@ function _shoot(sc) {
     var hit = sc.pickWithRay(ray);
     
     if (hit.hit && hit.pickedMesh) {
-        // Spawn hit decal effect
         spawnHitDecal(hit.pickedPoint, hit.getNormal(true), hit.pickedMesh);
         
         // Find the enemy root
@@ -263,10 +252,6 @@ function _shoot(sc) {
         }
     }
 }
- 
-
- 
-
 
 function _updateHUD() {
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();

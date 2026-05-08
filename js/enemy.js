@@ -168,9 +168,12 @@ async function loadEnemyModel(scene, config, position, playerMesh) {
         physicsParent.geometryMeshes = geometryMeshes;
         physicsParent.modelRoot = modelRoot;
  
-        // 8. Tagging for your shoot function
+        // 8. Set material properties to prevent shader errors
         geometryMeshes.forEach(m => {
             m.enemyRoot = physicsParent; 
+            if (m.material) {
+                m.material.maxSimultaneousLights = 4;
+            }
         });
  
         return physicsParent;
@@ -203,6 +206,7 @@ function createPrimitiveEnemy(scene, config, position, playerMesh) {
     var matName = "enemyMat_" + config.name + "_" + Math.random().toString(36).substr(2, 5);
     var enemyMaterial = new BABYLON.StandardMaterial(matName, scene);
     enemyMaterial.diffuseColor = new BABYLON.Color3(config.color.r, config.color.g, config.color.b);
+    enemyMaterial.maxSimultaneousLights = 4; // Limit lights
     enemy.material = enemyMaterial;
     
     // Setup physics

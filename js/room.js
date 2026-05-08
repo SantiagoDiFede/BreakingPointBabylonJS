@@ -14,7 +14,7 @@ class Room {
         this.worldZ = worldZ || 0;
     }
 
-    create() {
+    async create() {
         var ox = this.worldX;
         var oz = this.worldZ;
 
@@ -25,6 +25,7 @@ class Room {
         floor.position = new BABYLON.Vector3(ox, -0.05, oz);
         var floorMat = new BABYLON.StandardMaterial("floorMat_" + this.roomId, this.scene);
         floorMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+        floorMat.maxSimultaneousLights = 4; // Limit lights to prevent shader errors
         floor.material = floorMat;
         this.meshes.push(floor);
         this.physicsAggregates.push(new BABYLON.PhysicsAggregate(
@@ -39,13 +40,13 @@ class Room {
         this._createWall("west",  new BABYLON.Vector3(ox - this.width / 2, 2.5, oz), WALL_THICKNESS, ROOM_HEIGHT, this.depth);
 
         // Room light
-        var light = new BABYLON.PointLight("roomLight_" + this.roomId, new BABYLON.Vector3(ox, 4, oz), this.scene);
-        light.intensity = 0.5;
-        this.meshes.push(light);
+        this.light = new BABYLON.PointLight("roomLight_" + this.roomId, new BABYLON.Vector3(ox, 4, oz), this.scene);
+        this.light.intensity = 0.5;
+        this.meshes.push(this.light);
 
-        // Spawn enemies at world positions
+        // Spawn enemies at world positions (Waiting for all models)
         var self = this;
-        this.enemyData.forEach(async function(data) {
+        var enemyPromises = this.enemyData.map(async function(data) {
             var pos = new BABYLON.Vector3(
                 ox + data.position.x,
                 data.position.y,
@@ -55,7 +56,10 @@ class Room {
             if (enemy) {
                 self.enemies.push(enemy);
             }
+            return enemy;
         });
+
+        await Promise.all(enemyPromises);
     }
 
     _createWall(direction, position, width, height, depth) {
@@ -106,6 +110,7 @@ class Room {
         wall.position = position;
         var wallMat = new BABYLON.StandardMaterial(uniqueName + "Mat", this.scene);
         wallMat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+        wallMat.maxSimultaneousLights = 4; // Limit lights to prevent shader errors
         wall.material = wallMat;
         this.meshes.push(wall);
         this.physicsAggregates.push(new BABYLON.PhysicsAggregate(
