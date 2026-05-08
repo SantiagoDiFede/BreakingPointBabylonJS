@@ -320,8 +320,7 @@ function spawnHitDecal(position, normal, parentMesh) {
         size: new BABYLON.Vector3(3.6, 3.6, 3.6)
     });
     const mat = new BABYLON.StandardMaterial("hitMat", scene);
-    // 🔁 Replace this path with your actual gif path
-    mat.diffuseTexture = new BABYLON.Texture("img/spark.gif", scene);
+    mat.diffuseTexture = new BABYLON.Texture("./img/spark.gif", scene);
     mat.diffuseTexture.hasAlpha = true;
     mat.useAlphaFromDiffuseTexture = true;
     mat.zOffset = -2;
