@@ -127,10 +127,13 @@ function createScene() {
     body.setMassProperties({ mass: 1, inertia: new BABYLON.Vector3(0, 0, 0) });
     body.setLinearDamping(0.9);
 
-    // ---------- MAP ----------
+    // ---------- MAP (build all rooms at once) ----------
     mapManager = new MapManager(sc);
     mapManager.initRandomMap();
-    _teleportPlayer(new BABYLON.Vector3(0, 2, 0));
+
+    // Spawn player at the start room's center
+    var spawnPos = mapManager.getSpawnPosition();
+    _teleportPlayer(spawnPos);
 
     // ---------- CAMERA ----------
     camera = new BABYLON.FreeCamera("fpsCamera", playerMesh.position.clone(), sc);
@@ -177,9 +180,6 @@ function createScene() {
     var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), sc);
     light.intensity = 0.3;
 
-    // ---------- DOOR TRANSITION COOLDOWN ----------
-    var cooldown = false;
-
     // ---------- GAME LOOP ----------
 sc.onBeforeRenderObservable.add(function() {
         if (gamePaused) return;
@@ -202,6 +202,9 @@ sc.onBeforeRenderObservable.add(function() {
             var cv = body.getLinearVelocity();
             body.setLinearVelocity(new BABYLON.Vector3(wishDir.x * speed, cv.y, wishDir.z * speed));
         }
+
+        // Update HUD based on player position
+        _updateHUD();
  
         // Door detection
         if (!cooldown) {
@@ -242,17 +245,6 @@ function _teleportPlayer(pos) {
     playerMesh.position.copyFrom(pos);
 }
 
-function _spawnPlayerFromDoor(dir) {
-    var room = mapManager.getCurrentRoom();
-    var offset = 6;
-    var pos = new BABYLON.Vector3(0, 2, 0);
-    if (dir === "north") pos.z = -(room.depth / 2 - offset);
-    if (dir === "south") pos.z = (room.depth / 2 - offset);
-    if (dir === "east") pos.x = -(room.width / 2 - offset);
-    if (dir === "west") pos.x = (room.width / 2 - offset);
-    _teleportPlayer(pos);
-}
-
 function _shoot(sc) {
     var ray = sc.createPickingRay(canvas.width / 2, canvas.height / 2, BABYLON.Matrix.Identity(), camera);
     var hit = sc.pickWithRay(ray);
@@ -277,5 +269,5 @@ function _shoot(sc) {
 
 function _updateHUD() {
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
-    if (hudRooms) hudRooms.textContent = mapManager.getVisitedCount() + " / " + mapManager.getRoomCount();
+    if (hudRooms) hudRooms.textContent = mapManager.getCurrentRoomName();
 }

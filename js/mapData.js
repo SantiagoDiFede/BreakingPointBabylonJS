@@ -1,12 +1,19 @@
-// 10 predefined maps for roguelike gameplay
-// Each map has 7-12 rooms. Room 0 is always the spawn room.
+// 8 predefined maps for roguelike gameplay
+// Each room has a grid position (gridX, gridZ) that determines its world position.
+// All rooms are built simultaneously — the player walks between them through door openings.
 // Door connections: { direction: targetRoomId }
-// enemyCount: {min, max} for random spawn on first visit
+// enemyCount: {min, max} for random spawn
 // allowedEnemyTypes: array of enemy type keys from ENEMY_TYPES
 
-function _r(id, name, w, d, doors, eMin, eMax, types) {
+// Room size constant (all rooms are square for alignment)
+var ROOM_SIZE = 60; // Increased from 40
+var ROOM_HEIGHT = 5;
+var WALL_THICKNESS = 0.5;
+
+function _r(id, name, gridX, gridZ, doors, eMin, eMax, types) {
     return {
-        id: id, name: name, width: w, depth: d,
+        id: id, name: name,
+        gridX: gridX, gridZ: gridZ,
         doors: doors,
         enemyCount: { min: eMin, max: eMax },
         allowedEnemyTypes: types || ["box"]
@@ -14,9 +21,9 @@ function _r(id, name, w, d, doors, eMin, eMax, types) {
 }
 
 var MAP_DATA = [
-    // ===== MAP 0: The Gauntlet (7 rooms, linear) =====
+    // ===== MAP 0: The Bunker (5 rooms, L-shape) =====
     {
-        name: "The Gauntlet",
+        name: "The Bunker",
         startRoomId: 0,
         rooms: [
             _r(0, "Spawn", 30, 30, { north: 1 }, 0, 0, []),
