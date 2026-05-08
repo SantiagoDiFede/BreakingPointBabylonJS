@@ -17,17 +17,27 @@ var maxHealth = 50;
 var lastDamageTime = 0;
 var damageCooldown = 500; // 0.5 seconds of invincibility after hit
 var isGameOver = false;
+var soundShoot, soundMenuMusic, soundGameMusic, soundEnemyDeath, soundGameOver;
+var audioInitialized = false;
 
 // ===========================
 // MENU STATE & FUNCTIONS
 // ===========================
 async function startGameFromMenu() {
+    // If audio not yet initialized (player clicked directly on "JOUER"), initialize it now
+    if (!audioInitialized) await initAudio();
+
     // Hide menu, show loading screen
     document.getElementById("main-menu").classList.add("hidden");
     document.getElementById("loading-screen").classList.remove("hidden");
 
     if (!gameStarted) {
         gameStarted = true;
+        
+        // Stop menu music, start game music
+        if (window.stopSound) window.stopSound(soundMenuMusic);
+        if (window.playSound) window.playSound(soundGameMusic);
+        
         await startGame();
     } else {
         // Already initialised – just resume
@@ -97,19 +107,73 @@ document.addEventListener("keydown", function(e) {
 });
 
 // ===========================
+// AUDIO INITIALIZATION
+// ===========================
+async function initAudio() {
+    if (audioInitialized) return;
+    audioInitialized = true;
+
+    // Use standard HTML5 Audio for reliability
+    soundShoot = new Audio("sounds/shoot.mp3");
+    soundMenuMusic = new Audio("sounds/menu_music.mp3");
+    soundMenuMusic.loop = true;
+    soundMenuMusic.volume = 0.6;
+    
+    soundGameMusic = new Audio("sounds/bg_music1.mp3");
+    soundGameMusic.loop = true;
+    soundGameMusic.volume = 0.4;
+    
+    soundEnemyDeath = new Audio("sounds/robot_death1.mp3");
+    soundGameOver = new Audio("sounds/game_over.mp3");
+
+    // Helper to play sounds with overlapping support
+    window.playSound = function(audioObj, overlap = false) {
+        if (!audioObj) return;
+        try {
+            if (overlap) {
+                audioObj.cloneNode().play().catch(e => {});
+            } else {
+                audioObj.currentTime = 0;
+                audioObj.play().catch(e => {});
+            }
+        } catch (e) {}
+    };
+
+    window.stopSound = function(audioObj) {
+        if (!audioObj) return;
+        try {
+            audioObj.pause();
+            audioObj.currentTime = 0;
+        } catch (e) {}
+    };
+
+    window.soundEnemyDeath = soundEnemyDeath;
+    
+    if (!gameStarted) {
+        window.playSound(soundMenuMusic, false);
+    }
+}
+
+// Any click on the page unlocks the audio and starts menu music
+window.addEventListener("click", initAudio, { once: true });
+
+// ===========================
 // GAME INITIALIZATION
 // ===========================
 async function startGame() {
     havokInstance = await HavokPhysics({
         locateFile: function(path) { return "https://cdn.babylonjs.com/havok/" + path; }
     });
-    canvas = document.querySelector("#myCanvas");
-    engine = new BABYLON.Engine(canvas, true);
-    scene = createScene();
+    
+    // Engine/Canvas might already be created by initAudio
+    if (!canvas) canvas = document.querySelector("#myCanvas");
+    if (!engine) engine = new BABYLON.Engine(canvas, true);
+    
+    // Initialize the main game scene
+    scene = new BABYLON.Scene(engine);
+    setupGameScene(scene);
 
     // We need to wait for the scene components to be ready
-    // Map building is async, but createScene itself is sync. 
-    // Let's refactor slightly to wait for mapManager.initRandomMap
     await mapManager.initRandomMap();
 
     // Spawn player at the start room's center
@@ -121,11 +185,13 @@ async function startGame() {
 }
 
 // ===========================
-// SCENE CREATION
+// SCENE SETUP
 // ===========================
-function createScene() {
-    var sc = new BABYLON.Scene(engine);
+function setupGameScene(sc) {
     sc.clearColor = new BABYLON.Color3(0.05, 0.05, 0.1);
+
+    // (Sounds are already loaded in initAudio)
+    // If they weren't, they would be here.
 
     // ---------- PHYSICS ----------
     var hk = new BABYLON.HavokPlugin(true, havokInstance);
@@ -168,7 +234,10 @@ function createScene() {
 
     // ---------- SHOOTING ----------
     window.addEventListener("click", function() {
-        if (document.pointerLockElement === canvas) _shoot(sc);
+        if (document.pointerLockElement === canvas) {
+            if (window.playSound) window.playSound(soundShoot, true);
+            _shoot(sc);
+        }
     });
 
     // ---------- INPUT ----------
@@ -317,6 +386,8 @@ function gameOver() {
 
     // 1. Stop the game engine and AI
     if (engine) engine.stopRenderLoop();
+    if (window.stopSound) window.stopSound(soundGameMusic);
+    if (window.playSound) window.playSound(soundGameOver);
 
     // 2. Release the mouse pointer
     document.exitPointerLock();
