@@ -24,7 +24,7 @@ var ENEMY_TYPES = {
         color: { r: 0.8, g: 0, b: 0.8 },
         mass: 0.8, restitution: 0.7, friction: 0.3,
         linearDamping: 0.5, angularDamping: 0.5,
-        modelRotation: { x: 0, y: 0, z: 0},
+        modelRotation: { x: 0, y: Math.PI /  2, z: 0},
         modelYOffset: -1,
         // NEW: Health and ragdoll settings
         health: 4,                    // More durable
@@ -40,7 +40,7 @@ var ENEMY_TYPES = {
         color: { r: 1, g: 0.5, b: 0 },
         mass: 0.7, restitution: 0.3, friction: 0.5,
         linearDamping: 0.4, angularDamping: 0.4,
-        modelRotation: { x: 0, y: 0, z: 0 },
+        modelRotation: { x: 0, y: Math.PI, z: 0 },
         modelYOffset: 0,
         // NEW: Health and ragdoll settings
         health: 2,                    // Fragile
@@ -59,7 +59,7 @@ var ENEMY_TYPES = {
         friction: 1.0,                 // High friction to prevent sliding
         linearDamping: 0.9, 
         angularDamping: 0.9,
-        modelRotation: { x: 0, y: 0, z: 0 },
+        modelRotation: { x: 0, y: Math.PI, z: 0 },
         modelYOffset: 0.8,            // Change from -1.5 to -0.2 to lift it out of ground
         health: 6,
         knockbackForce: 0.5,

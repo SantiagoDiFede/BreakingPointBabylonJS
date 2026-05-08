@@ -74,11 +74,27 @@
     <!-- GAME -->
     <canvas id="myCanvas"></canvas>
     <div id="crosshair" class="hidden"></div>
-    <div id="hud" class="hidden">
-        <div id="hud-map-label">MAP</div>
-        <div id="hud-map">-</div>
-        <div id="hud-rooms-label">SALLE</div>
+<div id="hud" class="hidden">
+    <div class="hud-top-left">
+        <div id="hud-map-label">SYSTEM_LOCATION</div>
+        <div id="hud-map">--</div>
+        <div id="hud-rooms-label">SECTOR</div>
         <div id="hud-rooms">—</div>
+    </div>
+
+    <div id="hud-hp-container">
+        <div class="hp-label">INTEGRITY</div>
+        <div id="hp-bar-bg">
+            <div id="hp-bar-fill">
+                <div class="hp-bar-glimmer"></div>
+            </div>
+        </div>
+        <div id="hp-text">5 / 5 HP</div>
+    </div>
+
+    <div id="damage-flash"></div>
+</div>
+</div>
     </div>
 
     <!-- PAUSE MENU -->
@@ -92,6 +108,20 @@
             <button class="menu-btn danger-btn" onclick="returnToMenu()">
                 <span class="btn-icon">⌂</span>
                 <span class="btn-text">MENU PRINCIPAL</span>
+            </button>
+        </div>
+    </div>
+
+
+    <div id="game-over-screen" class="hidden">
+        <div id="game-over-content">
+            <div id="game-over-title">SYSTEM FAILURE</div>
+            <div id="game-over-subtitle">USER DECEASED - CONNECTION TERMINATED</div>
+            <div id="game-over-stats">
+                </div>
+            <button class="menu-btn danger-btn" onclick="location.reload()">
+                <span class="btn-icon">↺</span>
+                <span class="btn-text">REBOOT SYSTEM</span>
             </button>
         </div>
     </div>

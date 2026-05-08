@@ -12,6 +12,11 @@ var inputMap = {};
 var hudMapName, hudRooms;
 var gameStarted = false;
 var gamePaused = false;
+var playerHealth = 50;
+var maxHealth = 50;
+var lastDamageTime = 0;
+var damageCooldown = 500; // 0.5 seconds of invincibility after hit
+var isGameOver = false;
 
 // ===========================
 // MENU STATE & FUNCTIONS
@@ -135,6 +140,11 @@ function createScene() {
         playerMesh, BABYLON.PhysicsShapeType.CAPSULE,
         { mass: 1, restitution: 0, friction: 1 }, sc
     );
+
+    window.playerAggregate = playerAggregate;
+
+    var gravityVector = new BABYLON.Vector3(0, -18.0, 0); 
+    sc.enablePhysics(gravityVector, hk);
     var body = playerAggregate.body;
     body.setAngularDamping(100);
     body.setMassProperties({ mass: 1, inertia: new BABYLON.Vector3(0, 0, 0) });
@@ -166,10 +176,11 @@ function createScene() {
 
     // ---------- JUMP ----------
     window.addEventListener("keydown", function(e) {
-        if (e.code === "Space") {
+if (e.code === "Space") {
             var vel = body.getLinearVelocity();
-            if (Math.abs(vel.y) < 0.05) {
-                body.applyImpulse(new BABYLON.Vector3(0, 5, 0), playerMesh.getAbsolutePosition());
+            if (Math.abs(vel.y) < 0.1) { // Loosened threshold slightly for higher gravity
+                // Increased impulse from 5 to 8 to compensate for heavier gravity
+                body.applyImpulse(new BABYLON.Vector3(0, 8, 0), playerMesh.getAbsolutePosition());
             }
         }
     });
@@ -200,6 +211,15 @@ function createScene() {
         if (inputMap["q"] || inputMap["a"]) moveDir.x -= 1;
         if (inputMap["d"]) moveDir.x += 1;
 
+        var body = playerAggregate.body;
+    var currentVel = body.getLinearVelocity();
+
+        if (currentVel.y < 0) {
+            // Player is falling - apply an extra downward force (Gravity Multiplier)
+            // Adjust 15 to make the fall even faster
+            body.applyForce(new BABYLON.Vector3(0, -15, 0), playerMesh.getAbsolutePosition());
+        }
+
         if (!moveDir.equals(BABYLON.Vector3.Zero())) {
             moveDir.normalize();
             var forward = camera.getDirection(BABYLON.Axis.Z);
@@ -207,7 +227,7 @@ function createScene() {
             var wishDir = forward.scale(moveDir.z).add(right.scale(moveDir.x));
             wishDir.y = 0;
             wishDir.normalize();
-            var speed = inputMap["shift"] ? 10 : 6;
+            var speed = inputMap["shift"] ? 15 : 9;
             var cv = body.getLinearVelocity();
             body.setLinearVelocity(new BABYLON.Vector3(wishDir.x * speed, cv.y, wishDir.z * speed));
         }
@@ -254,6 +274,65 @@ function _shoot(sc) {
 }
 
 function _updateHUD() {
+    updateHPUI();
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
     if (hudRooms) hudRooms.textContent = mapManager.getCurrentRoomName();
+}
+
+function takeDamage(amount) {
+    const now = Date.now();
+    if (now - lastDamageTime < damageCooldown || playerHealth <= 0) return;
+
+    playerHealth -= amount;
+    lastDamageTime = now;
+
+    // Trigger Flash Effect
+    const flash = document.getElementById("damage-flash");
+    flash.style.opacity = "1";
+    setTimeout(() => { flash.style.opacity = "0"; }, 150);
+
+    updateHPUI();
+
+    if (playerHealth <= 0) {
+        gameOver();
+    }
+}
+
+function updateHPUI() {
+    const fill = document.getElementById("hp-bar-fill");
+    const text = document.getElementById("hp-text");
+    const percentage = (playerHealth / maxHealth) * 100;
+    
+    fill.style.width = Math.max(0, percentage) + "%";
+    text.innerText = Math.max(0, playerHealth) + " / " + maxHealth + " HP";
+}
+
+function gameOver() {
+    if (isGameOver) return; // Prevent multiple triggers
+    isGameOver = true;
+    gamePaused = true;
+
+    // 1. Stop the game engine and AI
+    if (engine) engine.stopRenderLoop();
+    
+    // 2. Release the mouse pointer
+    document.exitPointerLock();
+
+    // 3. Hide HUD and Crosshair
+    document.getElementById("crosshair").classList.add("hidden");
+    document.getElementById("hud").classList.add("hidden");
+
+    // 4. Trigger a permanent red flash effect
+    const flash = document.getElementById("damage-flash");
+    if (flash) {
+        flash.style.transition = "opacity 1s ease";
+        flash.style.backgroundColor = "rgba(139, 0, 0, 0.6)";
+        flash.style.opacity = "1";
+    }
+
+    // 5. Show the Game Over screen
+    const goScreen = document.getElementById("game-over-screen");
+    if (goScreen) {
+        goScreen.classList.remove("hidden");
+    }
 }

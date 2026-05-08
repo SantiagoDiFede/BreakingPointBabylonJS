@@ -32,11 +32,11 @@ function initializeMeleeAI(enemy, scene) {
 
 function initializeRangedAI(enemy, scene) {
     const config = enemy.enemyConfig;
-    enemy.aiState.shootInterval = config.name === "Box" ? 1500 : 2200;
-    enemy.aiState.projectileSpeed = 15;
-    enemy.aiState.projectileSize = 0.3;
-    enemy.aiState.detectionRange = 35;
-    enemy.aiState.shootRange = 30;
+    enemy.aiState.shootInterval = config.name === "Box" ? 1500 : 3200;
+    enemy.aiState.projectileSpeed =  config.name === "Box" ? 20 :  10;
+    enemy.aiState.projectileSize =  config.name === "Box" ? 0.8 : 0.5;
+    enemy.aiState.detectionRange = config.name === "Box" ? 35 : 35;
+    enemy.aiState.shootRange = config.name === "Box" ? 25 : 35;
     enemy.aiState.rotationSpeed = 0.08; // Shooters turn a bit slower
     
     enemy.updateAI = function(deltaTime) {
@@ -92,6 +92,17 @@ function updateMeleeAI(enemy, deltaTime) {
             body.setLinearVelocity(new BABYLON.Vector3(0, currentVel.y, 0));
         }
     }
+
+    const dist = BABYLON.Vector3.Distance(enemy.position, player.position);
+
+    if (dist < 2.0) { // Touching distance
+        const now = Date.now();
+        if (!enemy.aiState.lastAttackTime || now - enemy.aiState.lastAttackTime > 1000) {
+            takeDamage(15);
+            enemy.aiState.lastAttackTime = now;
+            console.log("Player hit by enemy!");
+        }
+    }
 }
 
 function updateRangedAI(enemy, deltaTime) {
@@ -124,29 +135,29 @@ function updateRangedAI(enemy, deltaTime) {
 function fireProjectile(enemy, targetPlayer, projectileSpeed, projectileSize) {
     const scene = enemy.getScene();
     
-    // Create projectile mesh
     const projectile = BABYLON.MeshBuilder.CreateSphere(
         "projectile",
         { diameter: projectileSize },
         scene
     );
     
-    // Position at enemy center
     projectile.position = enemy.position.clone();
-    projectile.position.y += 1; // Shoot from approximate eye height
+    projectile.position.y += 1; 
     
-    // Create projectile material
     const projMat = new BABYLON.StandardMaterial("projectileMat_" + Math.random(), scene);
-    projMat.diffuseColor = new BABYLON.Color3(1, 0.6, 0); // Orange-yellow
-    projMat.emissiveColor = new BABYLON.Color3(0.5, 0.3, 0);
-    projectile.material = projMat;
+    // A dark, cool grey for the base metal
+    projMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.22); 
+
+    // A very subtle glow to simulate metallic sheen/reflection
+    // (Keep this low so it doesn't look like it's glowing in the dark)
+    projMat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.07);
+
+    // Optional: If you want that polished bullet "shine"
+    projMat.specularColor = new BABYLON.Color3(0.4, 0.4, 0.45);
+    projMat.specularPower = 64;
+        
+    const direction = targetPlayer.position.subtract(projectile.position).normalize();
     
-    // Calculate direction to player with slight height adjustment
-    const direction = targetPlayer.position.subtract(projectile.position);
-    direction.y += 0.5; // Aim slightly above player center
-    direction.normalize();
-    
-    // Setup physics
     const projectileAggregate = new BABYLON.PhysicsAggregate(
         projectile,
         BABYLON.PhysicsShapeType.SPHERE,
@@ -154,52 +165,60 @@ function fireProjectile(enemy, targetPlayer, projectileSpeed, projectileSize) {
         scene
     );
     
+    projectile.physicsAggregate = projectileAggregate;
     const projectileBody = projectileAggregate.body;
-    projectileBody.setLinearVelocity(direction.scale(projectileSpeed));
-    projectileBody.setLinearDamping(0.1);
-    projectileBody.setAngularDamping(0.5);
     
-    // Tag it as a projectile for collision detection
+    projectileBody.setGravityFactor(0);
+    projectileBody.setLinearVelocity(direction.scale(projectileSpeed));
+    
     projectile.isProjectile = true;
     projectile.sourceEnemy = enemy;
-    projectile.createdTime = Date.now();
-    projectile.maxLifetime = 15000; // 15 seconds
+    projectile.maxLifetime = 10000; 
+
+    // --- FIX: USE COLLISION OBSERVABLE ---
+    // 1. Enable collision callbacks for this body
+    projectileBody.setCollisionCallbackEnabled(true);
     
-    // Setup collision with player
-    projectileAggregate.onCollide = (body) => {
-        handleProjectileCollision(projectile, body, scene);
-    };
+    // 2. Add the observer to detect collisions
+    projectileBody.getCollisionObservable().add((collisionEvent) => {
+        // collisionEvent.collidedAgainst is the other physics body
+        handleProjectileCollision(projectile, collisionEvent.collidedAgainst, scene);
+    });
+    // -------------------------------------
     
-    // Auto-cleanup after timeout
     setTimeout(() => {
         if (projectile && !projectile.isDisposed()) {
-            projectile.physicsAggregate.dispose();
+            if (projectile.physicsAggregate) projectile.physicsAggregate.dispose();
             projectile.dispose();
         }
     }, projectile.maxLifetime);
 }
- 
 /**
  * Handle projectile collision
  */
 function handleProjectileCollision(projectile, otherBody, scene) {
     if (projectile.isDisposed()) return;
-    
-    // Damage player if hit
-    // TODO: Implement player damage when you add player health
-    // For now, just remove the projectile
-    
+
+    // Check if the body we hit is the player's physics body
+    if (window.playerAggregate && otherBody === window.playerAggregate.body) {
+        // Call the damage function in main.js
+        if (typeof takeDamage === "function") {
+            takeDamage(10); 
+        }
+        console.log("Player hit by projectile!");
+    }
+
     // Visual effect at impact
     spawnHitDecal(projectile.position, BABYLON.Vector3.Down(), 
                   scene.getMeshByName("ground") || scene.meshes[0]);
     
-    // Cleanup
+    // Cleanup physics and mesh
     if (projectile.physicsAggregate) {
         projectile.physicsAggregate.dispose();
+        projectile.physicsAggregate = null;
     }
     projectile.dispose();
 }
- 
 /**
  * Main AI update loop - call this in your game loop
  */
