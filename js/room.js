@@ -46,6 +46,7 @@ class Room {
 
         // Spawn enemies at world positions (Waiting for all models)
         var self = this;
+        var enemyPromises = [];
         this.enemyData.forEach(function(data) {
             var pos = new BABYLON.Vector3(
                 ox + data.position.x,
@@ -53,11 +54,12 @@ class Room {
                 oz + data.position.z
             );
             // Pass playerMesh so AI can be initialized
-            createEnemy(self.scene, null, playerMesh, pos, data.type).then(function(enemy) {
+            var promise = createEnemy(self.scene, null, playerMesh, pos, data.type).then(function(enemy) {
                 if (enemy) {
                     self.enemies.push(enemy);
                 }
             });
+            enemyPromises.push(promise);
         });
 
         await Promise.all(enemyPromises);

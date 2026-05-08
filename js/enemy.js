@@ -41,7 +41,7 @@ var ENEMY_TYPES = {
         mass: 0.7, restitution: 0.3, friction: 0.5,
         linearDamping: 0.4, angularDamping: 0.4,
         modelRotation: { x: 0, y: 0, z: 0 },
-        modelYOffset: -1,
+        modelYOffset: 0,
         // NEW: Health and ragdoll settings
         health: 2,                    // Fragile
         knockbackForce: 2.5,          // Lighter but more knockback
@@ -54,13 +54,15 @@ var ENEMY_TYPES = {
         modelPath: "models/tankbot.glb",
         useModel: true,
         color: { r: 0.3, g: 0.3, b: 1 },
-        mass: 3, restitution: 0.2, friction: 0.8,
-        linearDamping: 0.9, angularDamping: 0.9,
+        mass: 10,                      // Increased mass for stability
+        restitution: 0.1, 
+        friction: 1.0,                 // High friction to prevent sliding
+        linearDamping: 0.9, 
+        angularDamping: 0.9,
         modelRotation: { x: 0, y: 0, z: 0 },
-        modelYOffset: -1.5,
-        // NEW: Health and ragdoll settings
-        health: 6,                    // Very durable
-        knockbackForce: 1,            // Heavy, barely moves
+        modelYOffset: 0.8,            // Change from -1.5 to -0.2 to lift it out of ground
+        health: 6,
+        knockbackForce: 0.5,
         ragdollKnockbackForce: 20,
         isGrounded: true
     }
@@ -176,19 +178,26 @@ async function loadEnemyModel(scene, config, position, playerMesh) {
 
  
         physicsParent.physicsAggregate = aggregate;
-        
-        // Configure physics damping
+
         var body = aggregate.body;
         body.setLinearDamping(config.linearDamping);
         body.setAngularDamping(config.angularDamping);
-        
-        // Grounded enemies: set to STATIC motion type (immovable)
-    if (config.isGrounded) {
-        const isMeleeChaser = config.name === "Tank" || config.name === "Fast Box";
-        if (!isMeleeChaser) {
-            body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+
+        if (config.isGrounded) {
+            const isMeleeChaser = config.name === "Tank" || config.name === "Fast Box";
+            if (isMeleeChaser) {
+                body.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
+                
+                // FIX: Lock X and Z rotation to prevent "listing" or tilting
+                // We set the inertia for X and Z to 0 so the engine won't rotate it on those axes.
+                body.setMassProperties({
+                    mass: config.mass,
+                    inertia: new BABYLON.Vector3(0, 1, 0) // Only allows Y-axis rotation
+                });
+            } else {
+                body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+            }
         }
-    }
  
         // 7. Initialize enemy-specific properties
         physicsParent.currentHealth = config.health;
