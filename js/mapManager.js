@@ -8,21 +8,23 @@ class MapManager {
     }
 
     // Pick a random map and build ALL rooms
-    initRandomMap() {
+    async initRandomMap() {
         var mapIndex = Math.floor(Math.random() * MAP_DATA.length);
         this.currentMap = MAP_DATA[mapIndex];
         console.log("Selected map: " + this.currentMap.name + " (" + this.currentMap.rooms.length + " rooms)");
 
-        this._buildAllRooms();
+        await this._buildAllRooms();
     }
 
     // Build every room in the map at its grid position
-    _buildAllRooms() {
+    async _buildAllRooms() {
         var self = this;
         this.rooms = [];
         this.roomDefs = [];
 
-        this.currentMap.rooms.forEach(function(roomDef) {
+        // Build rooms one by one or in parallel
+        // Using parallel for speed, but room.create is already internally parallel for enemies
+        var roomPromises = this.currentMap.rooms.map(async function(roomDef) {
             // Compute world position from grid coordinates
             var worldX = roomDef.gridX * ROOM_SIZE;
             var worldZ = roomDef.gridZ * ROOM_SIZE;
@@ -40,13 +42,15 @@ class MapManager {
             // Create room at world position
             var room = new Room(self.scene, ROOM_SIZE, ROOM_SIZE, doorConfig, enemyData, worldX, worldZ);
             room.roomId = roomDef.id;
-            room.create();
+            await room.create(); // Wait for room and its enemies to be created
 
             self.rooms.push(room);
             self.roomDefs.push(roomDef);
 
             console.log("Built room: " + roomDef.name + " (id=" + roomDef.id + ") at world (" + worldX + ", " + worldZ + ") enemies=" + enemyData.length);
         });
+
+        await Promise.all(roomPromises);
     }
 
     // Generate random enemies for a room definition
@@ -100,6 +104,7 @@ class MapManager {
 
     // Get spawn position (center of start room)
     getSpawnPosition() {
+        if (!this.currentMap) return new BABYLON.Vector3(0, 2, 0);
         var startId = this.currentMap.startRoomId;
         for (var i = 0; i < this.roomDefs.length; i++) {
             if (this.roomDefs[i].id === startId) {
@@ -124,6 +129,30 @@ class MapManager {
     getCurrentRoomName() {
         var def = this.getCurrentRoomDef();
         return def ? def.name : "—";
+    }
+
+    // Manage lights based on player proximity to avoid GL_MAX_VERTEX_UNIFORM_BUFFERS error
+    updateProximityLights() {
+        var currentRoomDef = this.getCurrentRoomDef();
+        if (!currentRoomDef) return;
+
+        // Collect IDs of current room and its direct neighbors
+        var activeRoomIds = new Set();
+        activeRoomIds.add(currentRoomDef.id);
+        
+        if (currentRoomDef.doors) {
+            for (var dir in currentRoomDef.doors) {
+                activeRoomIds.add(currentRoomDef.doors[dir]);
+            }
+        }
+
+        // Toggle room lights
+        for (var i = 0; i < this.rooms.length; i++) {
+            var room = this.rooms[i];
+            if (room.light) {
+                room.light.setEnabled(activeRoomIds.has(room.roomId));
+            }
+        }
     }
 
     // Dispose all rooms (for restart / return to menu)
