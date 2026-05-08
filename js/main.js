@@ -9,7 +9,7 @@ var playerAggregate;
 var mapManager;
 var inputMap = {};
 
-var hudMapName, hudRooms;
+var hudMapName, hudRooms, hudEnemies, hudRemainingRooms;
 var gameStarted = false;
 var gamePaused = false;
 var playerHealth = 50;
@@ -17,6 +17,7 @@ var maxHealth = 50;
 var lastDamageTime = 0;
 var damageCooldown = 500; // 0.5 seconds of invincibility after hit
 var isGameOver = false;
+var isVictory = false;
 var soundShoot, soundMenuMusic, soundGameMusic, soundEnemyDeath, soundGameOver, soundTankDeath, soundRobotNoises = [];
 var audioInitialized = false;
 
@@ -241,6 +242,7 @@ function setupGameScene(sc) {
     hudMapName = document.getElementById("hud-map");
     hudRooms = document.getElementById("hud-rooms");
     hudEnemies = document.getElementById("hud-enemies");
+    hudRemainingRooms = document.getElementById("hud-remaining-rooms");
     _updateHUD();
 
     // ---------- SHOOTING ----------
@@ -316,8 +318,13 @@ if (e.code === "Space") {
         // Update HUD, lights and room clearing status based on player position
         _updateHUD();
         mapManager.updateProximityLights();
-        mapManager.checkCurrentRoomCleared();
-
+        
+        if (mapManager.checkCurrentRoomCleared()) {
+            // If current room cleared, check if ALL rooms are cleared
+            if (mapManager.isAllRoomsCleared() && !isVictory) {
+                showVictory();
+            }
+        }
  
         // ADDED: Update enemy AI
         var deltaTime = engine.getDeltaTime() / 1000; // Convert to seconds
@@ -333,9 +340,21 @@ if (e.code === "Space") {
 function _teleportPlayer(pos) {
     if (!playerAggregate) return;
     var body = playerAggregate.body;
+    
+    // Stop all movement
     body.setLinearVelocity(BABYLON.Vector3.Zero());
-    body.setTargetTransform(pos, BABYLON.Quaternion.Identity());
+    body.setAngularVelocity(BABYLON.Vector3.Zero());
+
+    // Instant teleport: Update mesh position
     playerMesh.position.copyFrom(pos);
+    
+    // Sync physics body to mesh position
+    body.setTargetTransform(pos, BABYLON.Quaternion.Identity());
+    
+    // Reset rotation
+    if (playerMesh.rotationQuaternion) {
+        playerMesh.rotationQuaternion.copyFrom(BABYLON.Quaternion.Identity());
+    }
 }
 
 function _shoot(sc) {
@@ -360,6 +379,7 @@ function _updateHUD() {
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
     if (hudRooms) hudRooms.textContent = mapManager.getCurrentRoomName();
     if (hudEnemies) hudEnemies.textContent = mapManager.getAliveEnemiesCount();
+    if (hudRemainingRooms) hudRemainingRooms.textContent = mapManager.getUnclearedRoomsCount();
 }
 
 function takeDamage(amount) {
@@ -391,7 +411,7 @@ function updateHPUI() {
 }
 
 function gameOver() {
-    if (isGameOver) return; // Prevent multiple triggers
+    if (isGameOver || isVictory) return; // Prevent multiple triggers
     isGameOver = true;
     gamePaused = true;
 
@@ -421,3 +441,72 @@ function gameOver() {
         goScreen.classList.remove("hidden");
     }
 }
+
+function showVictory() {
+    if (isVictory || isGameOver) return;
+    isVictory = true;
+    gamePaused = true;
+
+    // Release pointer lock
+    document.exitPointerLock();
+
+    // Show victory screen
+    document.getElementById("crosshair").classList.add("hidden");
+    document.getElementById("hud").classList.add("hidden");
+    document.getElementById("victory-screen").classList.remove("hidden");
+
+    console.log("VICTORY! Map cleared.");
+}
+
+async function nextLevel() {
+    // Hide victory screen
+    document.getElementById("victory-screen").classList.add("hidden");
+    document.getElementById("loading-screen").classList.remove("hidden");
+
+    // Reset states (Stay paused during generation)
+    isVictory = false;
+    playerHealth = maxHealth;
+    updateHPUI();
+
+    // 1. Select next map data (to know where the spawn is)
+    mapManager.selectRandomMap();
+
+    // 2. Dispose old map assets
+    mapManager.disposeMap();
+    clearProjectiles(scene);
+
+    // 3. Teleport player to the NEW spawn location (map is empty right now)
+    var spawnPos = mapManager.getSpawnPosition();
+    _teleportPlayer(spawnPos);
+
+    // Freeze player physics during build
+    if (playerAggregate && playerAggregate.body) {
+        playerAggregate.body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+    }
+
+    // DELAY: Wait 3 seconds before generating the new map (cinematic/stability)
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // 4. Build the new map geometry and enemies
+    await mapManager.buildSelectedMap();
+
+    // Final check on position (just in case)
+    _teleportPlayer(spawnPos);
+
+    // Re-enable physics movement
+    if (playerAggregate && playerAggregate.body) {
+        playerAggregate.body.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
+    }
+
+    // Resume game ONLY after everything is ready
+    gamePaused = false;
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("crosshair").classList.remove("hidden");
+    document.getElementById("hud").classList.remove("hidden");
+    
+    // Re-lock mouse after a short delay
+    setTimeout(() => {
+        if (!gamePaused) canvas.requestPointerLock();
+    }, 500);
+}
+window.nextLevel = nextLevel;

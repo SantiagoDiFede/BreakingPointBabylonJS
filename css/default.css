@@ -436,6 +436,64 @@ html, body {
             letter-spacing: 4px;
             text-transform: uppercase;
         }
+
+        /* VICTORY SCREEN */
+        #victory-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 10, 20, 0.92);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 250;
+            font-family: 'Orbitron', sans-serif;
+            animation: victoryFadeIn 0.8s ease-out;
+        }
+
+        @keyframes victoryFadeIn {
+            from { opacity: 0; backdrop-filter: blur(0px); }
+            to { opacity: 1; backdrop-filter: blur(10px); }
+        }
+
+        #victory-content {
+            text-align: center;
+            padding: 60px;
+            border: 2px solid #00ccff;
+            background: rgba(0, 20, 40, 0.8);
+            box-shadow: 0 0 60px rgba(0, 204, 255, 0.4);
+            border-radius: 10px;
+            max-width: 600px;
+        }
+
+        #victory-title {
+            font-size: 3.5rem;
+            color: #ffd700;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+
+        #victory-subtitle {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.2rem;
+            color: #00ccff;
+            margin-bottom: 30px;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        #victory-message {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.4rem;
+            color: #ffffff;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
         
         .hidden { display: none !important; }
 
@@ -459,17 +517,23 @@ html, body {
     border-left: 2px solid #7b2fff;
 }
 
-#hud-map-label, #hud-rooms-label {
+#hud-map-label, #hud-rooms-label, #hud-enemies-label, #hud-remaining-label {
     font-size: 9px;
     color: rgba(123, 47, 255, 0.7);
     letter-spacing: 2px;
+    margin-top: 10px;
 }
 
-#hud-map {
+#hud-map, #hud-rooms, #hud-enemies, #hud-remaining-rooms {
     font-size: 18px;
     color: #fff;
     text-shadow: 0 0 10px rgba(123, 47, 255, 0.5);
-    margin-bottom: 5px;
+    margin-bottom: 2px;
+}
+
+#hud-enemies, #hud-remaining-rooms {
+    color: #ff4444;
+    text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
 }
 
 /* ===========================

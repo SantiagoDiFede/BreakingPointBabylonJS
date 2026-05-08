@@ -7,13 +7,42 @@ class MapManager {
         this.roomDefs = [];    // Parallel array of room definitions
     }
 
-    // Pick a random map and build ALL rooms
-    async initRandomMap() {
+    // Step 1: Just pick the data
+    selectRandomMap() {
         var mapIndex = Math.floor(Math.random() * MAP_DATA.length);
         this.currentMap = MAP_DATA[mapIndex];
-        console.log("Selected map: " + this.currentMap.name + " (" + this.currentMap.rooms.length + " rooms)");
+        console.log("Selected map: " + this.currentMap.name);
+        return this.currentMap;
+    }
 
+    // Step 2: Build the rooms for the currently selected map
+    async buildSelectedMap() {
+        if (!this.currentMap) return;
+        console.log("Building map: " + this.currentMap.name + " (" + this.currentMap.rooms.length + " rooms)");
         await this._buildAllRooms();
+    }
+
+    // Original combined method for backward compatibility if needed
+    async initRandomMap() {
+        this.selectRandomMap();
+        await this.buildSelectedMap();
+    }
+
+    // Dispose all current rooms and their contents
+    disposeMap() {
+        this.rooms.forEach(room => {
+            room.meshes.forEach(m => {
+                if (m.dispose) m.dispose();
+            });
+            room.enemies.forEach(e => {
+                if (e.dispose) e.dispose();
+                // If it has physics
+                if (e.physicsAggregate) e.physicsAggregate.dispose();
+            });
+            room.doorBlocks.forEach(b => b.dispose());
+        });
+        this.rooms = [];
+        this.roomDefs = [];
     }
 
     // Build every room in the map at its grid position
@@ -106,12 +135,17 @@ class MapManager {
     getSpawnPosition() {
         if (!this.currentMap) return new BABYLON.Vector3(0, 2, 0);
         var startId = this.currentMap.startRoomId;
-        for (var i = 0; i < this.roomDefs.length; i++) {
-            if (this.roomDefs[i].id === startId) {
+        
+        // Prefer using currentMap.rooms directly if build hasn't happened yet
+        var roomsToSearch = this.currentMap.rooms;
+        
+        for (var i = 0; i < roomsToSearch.length; i++) {
+            var r = roomsToSearch[i];
+            if (r.id === startId) {
                 return new BABYLON.Vector3(
-                    this.roomDefs[i].gridX * ROOM_SIZE,
+                    r.gridX * ROOM_SIZE,
                     2,
-                    this.roomDefs[i].gridZ * ROOM_SIZE
+                    r.gridZ * ROOM_SIZE
                 );
             }
         }
@@ -146,6 +180,15 @@ class MapManager {
             return room.checkRoomCleared();
         }
         return true;
+    }
+
+    // Check if the whole map is cleared
+    isAllRoomsCleared() {
+        return this.rooms.every(room => room.isCleared);
+    }
+
+    getUnclearedRoomsCount() {
+        return this.rooms.filter(room => !room.isCleared).length;
     }
 
     // Manage lights based on player proximity to avoid GL_MAX_VERTEX_UNIFORM_BUFFERS error

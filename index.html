@@ -82,6 +82,8 @@
         <div id="hud-rooms">—</div>
         <div id="hud-enemies-label">ENNEMIS</div>
         <div id="hud-enemies">0</div>
+        <div id="hud-remaining-label">SALLES RESTANTES</div>
+        <div id="hud-remaining-rooms">0</div>
     </div>
 
     <div id="hud-hp-container">
@@ -124,6 +126,19 @@
             <button class="menu-btn danger-btn" onclick="location.reload()">
                 <span class="btn-icon">↺</span>
                 <span class="btn-text">REBOOT SYSTEM</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- VICTORY SCREEN -->
+    <div id="victory-screen" class="hidden">
+        <div id="victory-content">
+            <div id="victory-title">MISSION COMPLETE</div>
+            <div id="victory-subtitle">AREA SECURED - CORE STABILIZED</div>
+            <div id="victory-message">Toutes les salles ont été nettoyées avec succès.</div>
+            <button class="menu-btn" onclick="nextLevel()">
+                <span class="btn-icon">➔</span>
+                <span class="btn-text">ZONE SUIVANTE</span>
             </button>
         </div>
     </div>
