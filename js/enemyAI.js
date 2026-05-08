@@ -9,6 +9,7 @@ function initializeEnemyAI(enemy, playerMesh, scene) {
         lastShotTime: 0,
         canSee: false,
         timeSinceLastCheck: 0,
+        nextNoiseTime: Date.now() + Math.random() * 10000 + 5000, // Random time between 5-15s
     };
     
     if (config.name === "Tank" || config.name === "Fast Box") {
@@ -103,6 +104,7 @@ function updateMeleeAI(enemy, deltaTime) {
             console.log("Player hit by enemy!");
         }
     }
+    updateEnemyNoise(enemy);
 }
 
 function updateRangedAI(enemy, deltaTime) {
@@ -127,6 +129,7 @@ function updateRangedAI(enemy, deltaTime) {
             }
         }
     }
+    updateEnemyNoise(enemy);
 }
  
 /**
@@ -231,6 +234,18 @@ function updateAllEnemyAI(deltaTime, mapManager) {
             enemy.updateAI(deltaTime);
         }
     });
+}
+
+function updateEnemyNoise(enemy) {
+    const now = Date.now();
+    if (enemy.aiState && enemy.aiState.nextNoiseTime && now > enemy.aiState.nextNoiseTime) {
+        if (window.soundRobotNoises && window.soundRobotNoises.length > 0 && window.playSound) {
+            const randomIndex = Math.floor(Math.random() * window.soundRobotNoises.length);
+            window.playSound(window.soundRobotNoises[randomIndex], true);
+        }
+        // Set next noise time (5 to 15 seconds)
+        enemy.aiState.nextNoiseTime = now + Math.random() * 10000 + 5000;
+    }
 }
  
 // ===========================

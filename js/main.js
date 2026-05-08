@@ -17,7 +17,7 @@ var maxHealth = 50;
 var lastDamageTime = 0;
 var damageCooldown = 500; // 0.5 seconds of invincibility after hit
 var isGameOver = false;
-var soundShoot, soundMenuMusic, soundGameMusic, soundEnemyDeath, soundGameOver;
+var soundShoot, soundMenuMusic, soundGameMusic, soundEnemyDeath, soundGameOver, soundTankDeath, soundRobotNoises = [];
 var audioInitialized = false;
 
 // ===========================
@@ -124,7 +124,18 @@ async function initAudio() {
     soundGameMusic.volume = 0.4;
     
     soundEnemyDeath = new Audio("sounds/robot_death1.mp3");
+    soundTankDeath = new Audio("sounds/tank_robot_death.mp3");
     soundGameOver = new Audio("sounds/game_over.mp3");
+
+    soundRobotNoises = [
+        new Audio("sounds/robot_noise1.mp3"),
+        new Audio("sounds/robot_noise2.mp3"),
+        new Audio("sounds/robot_noise3.mp3"),
+        new Audio("sounds/robot_noise4.mp3")
+    ];
+
+    window.soundTankDeath = soundTankDeath;
+    window.soundRobotNoises = soundRobotNoises;
 
     // Helper to play sounds with overlapping support
     window.playSound = function(audioObj, overlap = false) {

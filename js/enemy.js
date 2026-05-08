@@ -424,7 +424,13 @@ function damageEnemy(enemy, scene, impactPoint, impactDirection) {
     
     // Check if enemy should die
     if (enemy.currentHealth <= 0) {
-        if (window.playSound) window.playSound(window.soundEnemyDeath, true);
+        if (window.playSound) {
+            if (config.name === "Tank" && window.soundTankDeath) {
+                window.playSound(window.soundTankDeath, true);
+            } else if (window.soundEnemyDeath) {
+                window.playSound(window.soundEnemyDeath, true);
+            }
+        }
         enableRagdoll(enemy, scene);
         
         // IMPORTANT: Delay knockback to let Havok process the motion type change
