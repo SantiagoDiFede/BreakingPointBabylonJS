@@ -1,42 +1,68 @@
-
-
-// Enemy type definitions - now with model paths
+// Enemy type definitions - now with model paths, health, and grounded physics
 var ENEMY_TYPES = {
     box: {
         name: "Box", 
         size: 2, 
-        modelPath: "/models/rob1.glb",  // Path to your .glb file
+        modelPath: "/models/rob1.glb",
         useModel: true,
         color: { r: 1, g: 0, b: 0 },
         mass: 1, restitution: 0.5, friction: 0.5,
-        linearDamping: 0.7, angularDamping: 0.7
+        linearDamping: 0.7, angularDamping: 0.7,
+        modelRotation: { x: 0, y: 0, z: 0 },
+        modelYOffset: -1,
+        // NEW: Health and ragdoll settings
+        health: 3,                    // Shots needed to kill
+        knockbackForce: 2,            // Reduced knockback while alive
+        ragdollKnockbackForce: 15,    // Strong knockback when dead
+        isGrounded: true              // Bolt to ground
     },
     sphere: {
         name: "Sphere", 
         size: 2.5, 
-        modelPath: "/models/semiautobot.glb",  // Path to your .glb file
+        modelPath: "/models/semiautobot.glb",
         useModel: true,
         color: { r: 0.8, g: 0, b: 0.8 },
         mass: 0.8, restitution: 0.7, friction: 0.3,
-        linearDamping: 0.5, angularDamping: 0.5
+        linearDamping: 0.5, angularDamping: 0.5,
+        modelRotation: { x: 0, y: 0, z: 0},
+        modelYOffset: -1,
+        // NEW: Health and ragdoll settings
+        health: 4,                    // More durable
+        knockbackForce: 1.5,
+        ragdollKnockbackForce: 18,
+        isGrounded: true
     },
     fast_box: {
         name: "Fast Box", 
         size: 1.5, 
-        modelPath: "/models/speedbot.glb",  // Path to your .glb file
+        modelPath: "/models/speedbot.glb",
         useModel: true,
         color: { r: 1, g: 0.5, b: 0 },
         mass: 0.7, restitution: 0.3, friction: 0.5,
-        linearDamping: 0.4, angularDamping: 0.4
+        linearDamping: 0.4, angularDamping: 0.4,
+        modelRotation: { x: -Math.PI / 8, y: 0, z: 0 },
+        modelYOffset: -1,
+        // NEW: Health and ragdoll settings
+        health: 2,                    // Fragile
+        knockbackForce: 2.5,          // Lighter but more knockback
+        ragdollKnockbackForce: 12,
+        isGrounded: true
     },
     tank: {
         name: "Tank", 
         size: 3, 
-        modelPath: "/models/tankbot.glb",  // Path to your .glb file
+        modelPath: "/models/tankbot.glb",
         useModel: true,
         color: { r: 0.3, g: 0.3, b: 1 },
         mass: 3, restitution: 0.2, friction: 0.8,
-        linearDamping: 0.9, angularDamping: 0.9
+        linearDamping: 0.9, angularDamping: 0.9,
+        modelRotation: { x: 0, y: 0, z: 0 },
+        modelYOffset: -2.1,
+        // NEW: Health and ragdoll settings
+        health: 6,                    // Very durable
+        knockbackForce: 1,            // Heavy, barely moves
+        ragdollKnockbackForce: 20,
+        isGrounded: true
     }
 };
 
@@ -44,38 +70,57 @@ function createEnemy(scene, ground, playerMesh, position, type) {
     type = type || "box";
     var config = ENEMY_TYPES[type] || ENEMY_TYPES.box;
     
+    var enemy;
     // Load model from .blend file
     if (config.useModel && config.modelPath) {
-        return loadEnemyModel(scene, config, position, playerMesh);
+        enemy = loadEnemyModel(scene, config, position, playerMesh);
     } else {
         // Fallback to primitive shapes
-        return createPrimitiveEnemy(scene, config, position, playerMesh);
+        enemy = createPrimitiveEnemy(scene, config, position, playerMesh);
     }
+    
+    console.log(playerMesh);
+    console.log(enemy);
+    // ADDED: Initialize AI behavior for the enemy
+    if (enemy && playerMesh) {
+        console.log("begin");
+        initializeEnemyAI(enemy, playerMesh, scene);
+    }
+    
+    return enemy;
 }
 
+ 
 async function loadEnemyModel(scene, config, position, playerMesh) {
     try {
         const result = await BABYLON.SceneLoader.ImportMeshAsync("", "", config.modelPath, scene);
         const modelRoot = result.meshes[0];
         
-        // 1. Create a "Physics Container" (the actual object that moves)
-        const physicsParent = new BABYLON.Mesh("enemy_container", scene);
-        physicsParent.position = position instanceof BABYLON.Vector3 ? 
-                                 position.clone() : 
-                                 new BABYLON.Vector3(position.x, 3, position.z);
+        // Get all geometry meshes
+        const geometryMeshes = result.meshes.filter(m => m.getTotalVertices() > 0);
+        
+        // 1. COMPUTE BOUNDS BEFORE parenting (in world space as loaded)
+        let minY = Infinity, maxY = -Infinity;
+        geometryMeshes.forEach(mesh => {
+            const bbox = mesh.getBoundingInfo().boundingBox;
+            minY = Math.min(minY, bbox.minimumWorld.y);
+            maxY = Math.max(maxY, bbox.maximumWorld.y);
+        });
+        const height = maxY - minY;
+        const halfHeight = height / 2;
 
-        // 2. Attach the model to our container
+        const physicsParent = new BABYLON.Mesh("enemy_container", scene);
+        
+        // Position the parent at the vertical center of the enemy's body
+        physicsParent.position = position.clone();
+        physicsParent.position.y += halfHeight; 
+
         modelRoot.parent = physicsParent;
 
-        // 3. OFFSET: Lift the model inside the container
-        // If your model is 2 units tall, lifting it by 1 unit puts feet at the origin
-        modelRoot.position = new BABYLON.Vector3(0, config.size / 2, 0);
-        
-        // 4. FIX ROTATION: Flip the model if it's upside down
-        modelRoot.rotation = new BABYLON.Vector3(0, Math.PI, 0); 
+        // Center the model Root so that its geometric center is at the Parent's 0,0,0
+        modelRoot.position.y = -(minY + halfHeight); 
 
-        // 5. PHYSICS: Apply to the PARENT container
-        const geometryMeshes = result.meshes.filter(m => m.getTotalVertices() > 0);
+        // Create the shape from the MESH, but apply it to the PARENT
         const shape = new BABYLON.PhysicsShapeConvexHull(geometryMeshes[0], scene);
         
         const aggregate = new BABYLON.PhysicsAggregate(
@@ -84,20 +129,56 @@ async function loadEnemyModel(scene, config, position, playerMesh) {
             { mass: config.mass, restitution: config.restitution },
             scene
         );
+        
+ 
+        // 3. Attach the model to our container
+        modelRoot.parent = physicsParent;
+ 
+        // 4. OFFSET: Position the model relative to the parent
+        modelRoot.position.y = -(minY + halfHeight) + (config.modelYOffset || 0);
+        
+        // 5. APPLY ROTATION: Use per-model rotation settings
+        if (config.modelRotation) {
+            modelRoot.rotation = new BABYLON.Vector3(
+                config.modelRotation.x || 0,
+                config.modelRotation.y || 0,
+                config.modelRotation.z || 0
+            );
+        }
+ 
 
+ 
         physicsParent.physicsAggregate = aggregate;
-
-        // 6. Tagging for your shoot function
+        
+        // Configure physics damping
+        var body = aggregate.body;
+        body.setLinearDamping(config.linearDamping);
+        body.setAngularDamping(config.angularDamping);
+        
+        // Grounded enemies: set to STATIC motion type (immovable)
+        if (config.isGrounded) {
+            body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+        }
+ 
+        // 7. Initialize enemy-specific properties
+        physicsParent.currentHealth = config.health;
+        physicsParent.maxHealth = config.health;
+        physicsParent.isDead = false;
+        physicsParent.enemyConfig = config;
+        physicsParent.geometryMeshes = geometryMeshes;
+        physicsParent.modelRoot = modelRoot;
+ 
+        // 8. Tagging for your shoot function
         geometryMeshes.forEach(m => {
             m.enemyRoot = physicsParent; 
         });
-
+ 
         return physicsParent;
     } catch (e) {
-        console.error(e);
+        console.error("Error loading enemy model:", e);
     }
 }
-
+ 
 function createPrimitiveEnemy(scene, config, position, playerMesh) {
     var enemy;
     
@@ -127,6 +208,12 @@ function createPrimitiveEnemy(scene, config, position, playerMesh) {
     // Setup physics
     setupEnemyPhysics(scene, enemy, config);
     
+    // Initialize enemy-specific properties
+    enemy.currentHealth = config.health;
+    enemy.maxHealth = config.health;
+    enemy.isDead = false;
+    enemy.enemyConfig = config;
+    
     // Interaction handler for kicking
     enemy.onInteract = function(pMesh) {
         var dist = BABYLON.Vector3.Distance(pMesh.position, enemy.position);
@@ -142,15 +229,16 @@ function createPrimitiveEnemy(scene, config, position, playerMesh) {
     
     return enemy;
 }
-
+ 
 function setupEnemyPhysics(scene, enemy, config) {
-    // For imported models, use CONVEX_HULL for better physics on complex shapes
+    // Use appropriate shape type based on grounded state
     var shapeType = config.useModel 
-        ? BABYLON.PhysicsShapeType.CONVEX_HULL  // Good for complex models
+        ? BABYLON.PhysicsShapeType.CONVEX_HULL
         : (config.meshType === "sphere" 
             ? BABYLON.PhysicsShapeType.SPHERE 
             : BABYLON.PhysicsShapeType.BOX);
     
+    // Always create with mass, but set motion type to control behavior
     var enemyAggregate = new BABYLON.PhysicsAggregate(
         enemy,
         shapeType,
@@ -163,13 +251,18 @@ function setupEnemyPhysics(scene, enemy, config) {
     );
     
     enemy.physicsAggregate = enemyAggregate;
+    var body = enemyAggregate.body;
     
     // Configure physics damping
-    var body = enemyAggregate.body;
     body.setLinearDamping(config.linearDamping);
     body.setAngularDamping(config.angularDamping);
+    
+    // Grounded enemies: set to STATIC motion type (immovable)
+    if (config.isGrounded) {
+        body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+    }
 }
-
+ 
 function spawnHitDecal(position, normal, parentMesh) {
     const decal = BABYLON.MeshBuilder.CreateDecal("hitDecal", parentMesh, {
         position: position,
@@ -181,8 +274,9 @@ function spawnHitDecal(position, normal, parentMesh) {
     mat.diffuseTexture = new BABYLON.Texture("../img/spark.gif", scene);
     mat.diffuseTexture.hasAlpha = true;
     mat.useAlphaFromDiffuseTexture = true;
-    mat.zOffset = -2;                      // prevents z-fighting with the surface
+    mat.zOffset = -2;
     decal.material = mat;
+    
     // Fade + remove after 600ms
     let elapsed = 0;
     const fadeObserver = scene.onBeforeRenderObservable.add(() => {
@@ -196,3 +290,156 @@ function spawnHitDecal(position, normal, parentMesh) {
         }
     });
 }
+ 
+/**
+ * Converts a grounded enemy to ragdoll physics on death
+ * Uses a velocity-based approach instead of changing physics bodies
+ */
+function enableRagdoll(enemy, scene) {
+    if (enemy.isDead) return;
+    
+    enemy.isDead = true;
+    enemy.isRagdolling = true;
+    const currentPos = enemy.absolutePosition.clone();
+    
+    // Keep the body but change its motion type to dynamic
+    if (enemy.physicsAggregate && enemy.physicsAggregate.body) {
+        var body = enemy.physicsAggregate.body;
+        
+        // Change from static to dynamic
+        body.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
+
+        body.setTargetTransform(currentPos, enemy.rotationQuaternion || BABYLON.Quaternion.Identity());
+        
+        // Set mass for dynamic behavior
+        var config = enemy.enemyConfig;
+        body.setMassProperties({ mass: config.mass });
+        
+        // Set damping for ragdoll effect
+        body.setLinearDamping(config.linearDamping);
+        body.setAngularDamping(config.angularDamping);
+    }
+    
+    // Create dead material
+    var deadMat = new BABYLON.StandardMaterial("deadMat_" + Math.random(), scene);
+    deadMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+    
+    // Visual indicator: change color to grey/dark
+    // For primitives - change the enemy mesh itself
+    if (enemy.material) {
+        enemy.material = deadMat;
+    }
+    
+    // For loaded models - change all child meshes
+    if (enemy.getChildren) {
+        var children = enemy.getChildren();
+        children.forEach(child => {
+            if (child instanceof BABYLON.Mesh) {
+                child.material = deadMat;
+            }
+        });
+    }
+    
+    // Also update geometryMeshes if they exist
+    if (enemy.geometryMeshes) {
+        enemy.geometryMeshes.forEach(mesh => {
+            mesh.material = deadMat;
+        });
+    }
+}
+ 
+/**
+ * Damage an enemy and check if it should die
+ */
+function damageEnemy(enemy, scene, impactPoint, impactDirection) {
+    if (enemy.isDead) return;
+    
+    var config = enemy.enemyConfig;
+    enemy.currentHealth--;
+    
+    console.log(enemy.enemyType + " hit! Health: " + enemy.currentHealth + "/" + enemy.maxHealth);
+    
+    // Apply knockback (reduced while alive)
+    if (enemy.physicsAggregate && enemy.physicsAggregate.body) {
+        // For grounded enemies, apply a small local effect
+        // We'll create a visual knockback by rotating slightly
+        if (config.isGrounded && !enemy.isDead) {
+            // Small rotation knockback for grounded enemies
+            var rotationAxis = new BABYLON.Vector3(0, 1, 0);
+            var rotationAmount = config.knockbackForce * 0.1;
+            enemy.rotation.z += (Math.random() - 0.5) * rotationAmount;
+            enemy.rotation.x += (Math.random() - 0.5) * rotationAmount * 0.5;
+        }
+    }
+    
+    // Check if enemy should die
+    if (enemy.currentHealth <= 0) {
+        enableRagdoll(enemy, scene);
+        
+        // IMPORTANT: Delay knockback to let Havok process the motion type change
+        // Without this delay, the impulse is applied to the static body
+        setTimeout(function() {
+                if (enemy.physicsAggregate && enemy.physicsAggregate.body) {
+                    var knockbackDir = impactDirection.clone().normalize();
+                    knockbackDir.y += 0.5; 
+                    var impulseForce = knockbackDir.scale(config.ragdollKnockbackForce);
+                    enemy.physicsAggregate.body.applyImpulse(impulseForce, impactPoint);
+                }
+                
+                // Start the timer to sink and disappear
+                handleDeathSequence(enemy, scene);
+            }, 10);
+    }
+}
+
+function handleDeathSequence(enemy, scene) {
+    // 1. Wait for 2 seconds while they ragdoll on the ground
+    setTimeout(() => {
+        if (!enemy || enemy.isDisposed()) return;
+
+        // 2. Disable physics collisions so it can fall through the floor
+        if (enemy.physicsAggregate) {
+            // We disable the body so it no longer reacts to gravity or collisions
+            enemy.physicsAggregate.body.disablePreStep = false; 
+            enemy.physicsAggregate.dispose(); 
+            enemy.physicsAggregate = null;
+        }
+
+        // 3. Create a "Sink and Disposed" animation
+        let sinkSpeed = 0.02;
+        let opacity = 1.0;
+
+        const sinkObserver = scene.onBeforeRenderObservable.add(() => {
+            // Move the mesh down
+            enemy.position.y -= sinkSpeed;
+            sinkSpeed += 0.005; // Accelerate the fall
+            
+            // Fade out the model
+            opacity -= 0.02;
+            
+            // Apply opacity to all children (for loaded models)
+            enemy.getChildMeshes().forEach(m => {
+                if (m.material) {
+                    m.material.alpha = opacity;
+                    m.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+                }
+            });
+
+            // 4. Final Cleanup: Remove from scene once it's deep enough or invisible
+            if (opacity <= 0 || enemy.position.y < -10) {
+                scene.onBeforeRenderObservable.remove(sinkObserver);
+                
+                // Remove from the room's enemy list so it doesn't break room transitions
+                const room = mapManager.getCurrentRoom();
+                if (room && room.enemies) {
+                    const index = room.enemies.indexOf(enemy);
+                    if (index > -1) room.enemies.splice(index, 1);
+                }
+
+                enemy.dispose();
+            }
+        });
+    }, 2000); // The 2-second "Death Throe" delay
+}
+
+

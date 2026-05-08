@@ -12,6 +12,7 @@ var inputMap = {};
 var hudMapName, hudRooms;
 var gameStarted = false;
 var gamePaused = false;
+var enemyUpdateInterval = 0;
 
 // ===========================
 // MENU STATE & FUNCTIONS
@@ -180,16 +181,16 @@ function createScene() {
     light.intensity = 0.3;
 
     // ---------- GAME LOOP ----------
-    sc.onBeforeRenderObservable.add(function() {
+sc.onBeforeRenderObservable.add(function() {
         if (gamePaused) return;
-
+ 
         // Movement
         var moveDir = BABYLON.Vector3.Zero();
         if (inputMap["z"] || inputMap["w"]) moveDir.z += 1;
         if (inputMap["s"]) moveDir.z -= 1;
         if (inputMap["q"] || inputMap["a"]) moveDir.x -= 1;
         if (inputMap["d"]) moveDir.x += 1;
-
+ 
         if (!moveDir.equals(BABYLON.Vector3.Zero())) {
             moveDir.normalize();
             var forward = camera.getDirection(BABYLON.Axis.Z);
@@ -204,6 +205,31 @@ function createScene() {
 
         // Update HUD based on player position
         _updateHUD();
+ 
+        // Door detection
+        if (!cooldown) {
+            var room = mapManager.getCurrentRoom();
+            if (room) {
+                room.meshes.forEach(function(mesh) {
+                    if (mesh.isDoor) {
+                        var dist = BABYLON.Vector3.Distance(playerMesh.position, mesh.position);
+                        if (dist < 2.5) {
+                            cooldown = true;
+                            mapManager.transitionToRoom(mesh.doorDirection);
+                            _spawnPlayerFromDoor(mesh.doorDirection);
+                            _updateHUD();
+                            // ADDED: Clear projectiles when changing rooms
+                            clearProjectiles(sc);
+                            setTimeout(function() { cooldown = false; }, 800);
+                        }
+                    }
+                });
+            }
+        }
+ 
+        // ADDED: Update enemy AI
+        var deltaTime = engine.getDeltaTime() / 1000; // Convert to seconds
+        updateAllEnemyAI(deltaTime, mapManager);
     });
 
     return sc;
@@ -224,23 +250,22 @@ function _shoot(sc) {
     var hit = sc.pickWithRay(ray);
     
     if (hit.hit && hit.pickedMesh) {
+        // Spawn hit decal effect
         spawnHitDecal(hit.pickedPoint, hit.getNormal(true), hit.pickedMesh);
         
         // Find the enemy root
         let target = hit.pickedMesh.enemyRoot || (hit.pickedMesh.physicsAggregate ? hit.pickedMesh : null);
         
-        if (target && target.physicsAggregate) {
-            // Wake up Havok
-            target.physicsAggregate.body.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
-            
-            // Strong impulse
-            target.physicsAggregate.body.applyImpulse(
-                ray.direction.scale(30), 
-                hit.pickedPoint
-            );
+        if (target && target.enemyConfig) {
+            // This is an enemy - damage it!
+            damageEnemy(target, sc, hit.pickedPoint, ray.direction);
         }
     }
 }
+ 
+
+ 
+
 
 function _updateHUD() {
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
