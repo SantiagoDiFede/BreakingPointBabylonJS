@@ -25,6 +25,7 @@ var MAP_DATA = [
     {
         name: "The Bunker",
         startRoomId: 0,
+        floorTexture: "img/thebunkertexture.png",
         rooms: [
             _r(0, "Spawn",       -1, 0, { east: 2 },                         0, 0, []),
             _r(1, "Watchtower",    0, 1, { south: 2 },                        2, 4, ["box"]),
@@ -38,6 +39,7 @@ var MAP_DATA = [
     {
         name: "The Cross",
         startRoomId: 0,
+        floorTexture: "img/thecrosstexture.png",
         rooms: [
             _r(0, "Nexus",    0, 0, { north: 1, east: 2, south: 3, west: 4 }, 0, 0, []),
             _r(1, "North",    0, 1, { south: 0 },                              2, 4, ["box"]),
@@ -51,6 +53,7 @@ var MAP_DATA = [
     {
         name: "The Serpent",
         startRoomId: 0,
+        floorTexture: "img/theserpenttexture.png",
         rooms: [
             _r(0, "Entrance",   0, 1, { east: 1 },                           0, 0, []),
             _r(1, "Corridor 1", 1, 1, { west: 0, south: 2 },                 2, 3, ["box"]),
@@ -65,6 +68,7 @@ var MAP_DATA = [
     {
         name: "The Maze",
         startRoomId: 0,
+        floorTexture: "img/themazetexture.png",
         rooms: [
             _r(0, "Entry", 0, 0, { north: 1, east: 2 }, 0, 0, []),
             _r(1, "Path North", 0, 1, { south: 0, north: 3 }, 2, 4, ["box"]),
@@ -83,6 +87,7 @@ var MAP_DATA = [
     {
         name: "The Loop",
         startRoomId: 0,
+        floorTexture: "img/thelooptexture.png",
         rooms: [
             _r(0, "Start", 0, 0, { north: 1, south: 7 }, 0, 0, []),
             _r(1, "Room 1", 0, 1, { south: 0, east: 2 }, 2, 4, ["box"]),
@@ -99,6 +104,7 @@ var MAP_DATA = [
     {
         name: "The Fortress",
         startRoomId: 0,
+        floorTexture: "img/thefortresstexture.png",
         rooms: [
             _r(0, "Gate", 0, 0, { north: 1 }, 0, 0, []),
             _r(1, "Courtyard", 0, 1, { south: 0, north: 2, west: 3, east: 4 }, 2, 4, ["box"]),
@@ -118,6 +124,7 @@ var MAP_DATA = [
     {
         name: "The Abyss",
         startRoomId: 0,
+        floorTexture: "img/theabysstexture.png",
         rooms: [
             _r(0, "Edge", 0, 0, { south: 1 }, 0, 0, []),
             _r(1, "Descent 1", 0,-1, { north: 0, south: 2 }, 2, 4, ["box"]),
@@ -138,6 +145,7 @@ var MAP_DATA = [
     {
         name: "The Laboratory",
         startRoomId: 0,
+        floorTexture: "img/thelaboratorytexture.png",
         rooms: [
             _r(0, "Reception", 0, 0, { east: 1 }, 0, 0, []),
             _r(1, "Hallway", 1, 0, { west: 0, north: 2, south: 3 }, 2, 4, ["box"]),

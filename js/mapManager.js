@@ -40,7 +40,7 @@ class MapManager {
             var enemyData = self._generateEnemies(roomDef);
 
             // Create room at world position
-            var room = new Room(self.scene, ROOM_SIZE, ROOM_SIZE, doorConfig, enemyData, worldX, worldZ);
+            var room = new Room(self.scene, ROOM_SIZE, ROOM_SIZE, doorConfig, enemyData, worldX, worldZ, self.currentMap.floorTexture);
             room.roomId = roomDef.id;
             await room.create(); // Wait for room and its enemies to be created
 

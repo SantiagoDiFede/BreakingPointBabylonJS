@@ -1,5 +1,5 @@
 class Room {
-    constructor(scene, width, depth, doorPositions, enemyData, worldX, worldZ) {
+    constructor(scene, width, depth, doorPositions, enemyData, worldX, worldZ, floorTexture) {
         this.scene = scene;
         this.width = width;
         this.depth = depth;
@@ -12,6 +12,7 @@ class Room {
         // World offset — room center in world coordinates
         this.worldX = worldX || 0;
         this.worldZ = worldZ || 0;
+        this.floorTexture = floorTexture || null;
     }
 
     async create() {
@@ -24,7 +25,14 @@ class Room {
         }, this.scene);
         floor.position = new BABYLON.Vector3(ox, -0.05, oz);
         var floorMat = new BABYLON.StandardMaterial("floorMat_" + this.roomId, this.scene);
-        floorMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+        if (this.floorTexture) {
+            floorMat.diffuseTexture = new BABYLON.Texture(this.floorTexture, this.scene);
+            // Tile the texture based on room size
+            floorMat.diffuseTexture.uScale = this.width / 30;
+            floorMat.diffuseTexture.vScale = this.depth / 30;
+        } else {
+            floorMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+        }
         floorMat.maxSimultaneousLights = 4; // Limit lights to prevent shader errors
         floor.material = floorMat;
         this.meshes.push(floor);
