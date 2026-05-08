@@ -131,6 +131,23 @@ class MapManager {
         return def ? def.name : "—";
     }
 
+    // Get count of alive enemies in current room
+    getAliveEnemiesCount() {
+        var room = this.getCurrentRoom();
+        return room ? room.getAliveEnemiesCount() : 0;
+    }
+
+    // Check if the player's current room is cleared of enemies
+    checkCurrentRoomCleared() {
+        var room = this.getCurrentRoom();
+        if (room) {
+            // Trigger spawning if not already active
+            room.activateEnemies();
+            return room.checkRoomCleared();
+        }
+        return true;
+    }
+
     // Manage lights based on player proximity to avoid GL_MAX_VERTEX_UNIFORM_BUFFERS error
     updateProximityLights() {
         var currentRoomDef = this.getCurrentRoomDef();

@@ -143,7 +143,7 @@ function createScene() {
 
     window.playerAggregate = playerAggregate;
 
-    var gravityVector = new BABYLON.Vector3(0, -18.0, 0); 
+    var gravityVector = new BABYLON.Vector3(0, -18.0, 0);
     sc.enablePhysics(gravityVector, hk);
     var body = playerAggregate.body;
     body.setAngularDamping(100);
@@ -163,6 +163,7 @@ function createScene() {
     // ---------- HUD ----------
     hudMapName = document.getElementById("hud-map");
     hudRooms = document.getElementById("hud-rooms");
+    hudEnemies = document.getElementById("hud-enemies");
     _updateHUD();
 
     // ---------- SHOOTING ----------
@@ -232,9 +233,10 @@ if (e.code === "Space") {
             body.setLinearVelocity(new BABYLON.Vector3(wishDir.x * speed, cv.y, wishDir.z * speed));
         }
 
-        // Update HUD and lights based on player position
+        // Update HUD, lights and room clearing status based on player position
         _updateHUD();
         mapManager.updateProximityLights();
+        mapManager.checkCurrentRoomCleared();
 
  
         // ADDED: Update enemy AI
@@ -277,6 +279,7 @@ function _updateHUD() {
     updateHPUI();
     if (hudMapName) hudMapName.textContent = mapManager.getMapName();
     if (hudRooms) hudRooms.textContent = mapManager.getCurrentRoomName();
+    if (hudEnemies) hudEnemies.textContent = mapManager.getAliveEnemiesCount();
 }
 
 function takeDamage(amount) {
@@ -302,7 +305,7 @@ function updateHPUI() {
     const fill = document.getElementById("hp-bar-fill");
     const text = document.getElementById("hp-text");
     const percentage = (playerHealth / maxHealth) * 100;
-    
+
     fill.style.width = Math.max(0, percentage) + "%";
     text.innerText = Math.max(0, playerHealth) + " / " + maxHealth + " HP";
 }
@@ -314,7 +317,7 @@ function gameOver() {
 
     // 1. Stop the game engine and AI
     if (engine) engine.stopRenderLoop();
-    
+
     // 2. Release the mouse pointer
     document.exitPointerLock();
 

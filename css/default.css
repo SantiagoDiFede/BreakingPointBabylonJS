@@ -57,6 +57,16 @@ html, body {
 #hud-rooms {
     font-size: 13px; color: #88aaff;
     text-shadow: 0 0 8px rgba(136,170,255,0.7);
+    margin-bottom: 8px;
+}
+#hud-enemies-label {
+    font-size: 9px; color: #666;
+    letter-spacing: 3px; text-transform: uppercase;
+}
+#hud-enemies {
+    font-size: 18px; font-weight: 700;
+    color: #ff3e3e;
+    text-shadow: 0 0 10px rgba(255,62,62,0.8);
 }
 
 /* LOADING SCREEN */
