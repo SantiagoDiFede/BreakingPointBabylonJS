@@ -13,6 +13,7 @@ var hudMapName, hudRooms;
 var gameStarted = false;
 var gamePaused = false;
 var enemyUpdateInterval = 0;
+var cooldown = false;
 
 // ===========================
 // MENU STATE & FUNCTIONS
