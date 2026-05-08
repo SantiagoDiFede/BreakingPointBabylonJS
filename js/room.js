@@ -45,16 +45,18 @@ class Room {
 
         // Spawn enemies at world positions
         var self = this;
-        this.enemyData.forEach(async function(data) {
+        this.enemyData.forEach(function(data) {
             var pos = new BABYLON.Vector3(
                 ox + data.position.x,
                 data.position.y,
                 oz + data.position.z
             );
-            var enemy = await createEnemy(self.scene, null, null, pos, data.type);
-            if (enemy) {
-                self.enemies.push(enemy);
-            }
+            // Pass playerMesh so AI can be initialized
+            createEnemy(self.scene, null, playerMesh, pos, data.type).then(function(enemy) {
+                if (enemy) {
+                    self.enemies.push(enemy);
+                }
+            });
         });
     }
 

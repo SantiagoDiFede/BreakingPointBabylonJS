@@ -3,7 +3,7 @@ var ENEMY_TYPES = {
     box: {
         name: "Box", 
         size: 2, 
-        modelPath: "/models/rob1.glb",
+        modelPath: "models/rob1.glb",
         useModel: true,
         color: { r: 1, g: 0, b: 0 },
         mass: 1, restitution: 0.5, friction: 0.5,
@@ -19,7 +19,7 @@ var ENEMY_TYPES = {
     sphere: {
         name: "Sphere", 
         size: 2.5, 
-        modelPath: "/models/semiautobot.glb",
+        modelPath: "models/semiautobot.glb",
         useModel: true,
         color: { r: 0.8, g: 0, b: 0.8 },
         mass: 0.8, restitution: 0.7, friction: 0.3,
@@ -35,12 +35,12 @@ var ENEMY_TYPES = {
     fast_box: {
         name: "Fast Box", 
         size: 1.5, 
-        modelPath: "/models/speedbot.glb",
+        modelPath: "models/speedbot.glb",
         useModel: true,
         color: { r: 1, g: 0.5, b: 0 },
         mass: 0.7, restitution: 0.3, friction: 0.5,
         linearDamping: 0.4, angularDamping: 0.4,
-        modelRotation: { x: -Math.PI / 8, y: 0, z: 0 },
+        modelRotation: { x: 0, y: 0, z: 0 },
         modelYOffset: -1,
         // NEW: Health and ragdoll settings
         health: 2,                    // Fragile
@@ -51,13 +51,13 @@ var ENEMY_TYPES = {
     tank: {
         name: "Tank", 
         size: 3, 
-        modelPath: "/models/tankbot.glb",
+        modelPath: "models/tankbot.glb",
         useModel: true,
         color: { r: 0.3, g: 0.3, b: 1 },
         mass: 3, restitution: 0.2, friction: 0.8,
         linearDamping: 0.9, angularDamping: 0.9,
         modelRotation: { x: 0, y: 0, z: 0 },
-        modelYOffset: -2.1,
+        modelYOffset: -1.5,
         // NEW: Health and ragdoll settings
         health: 6,                    // Very durable
         knockbackForce: 1,            // Heavy, barely moves
@@ -70,30 +70,57 @@ function createEnemy(scene, ground, playerMesh, position, type) {
     type = type || "box";
     var config = ENEMY_TYPES[type] || ENEMY_TYPES.box;
     
-    var enemy;
     // Load model from .blend file
     if (config.useModel && config.modelPath) {
-        enemy = loadEnemyModel(scene, config, position, playerMesh);
+        return loadEnemyModel(scene, config, position, playerMesh)
+            .then(function(enemy) {
+                // Initialize AI behavior for the enemy
+                if (enemy && playerMesh) {
+                    console.log("begin");
+                    initializeEnemyAI(enemy, playerMesh, scene);
+                }
+                return enemy;
+            })
+            .catch(function(error) {
+                // Fallback to primitive enemy if model fails to load
+                console.warn("Failed to load model, using primitive instead:", error);
+                var enemy = createPrimitiveEnemy(scene, config, position, playerMesh);
+                if (enemy && playerMesh) {
+                    initializeEnemyAI(enemy, playerMesh, scene);
+                }
+                return enemy;
+            });
     } else {
         // Fallback to primitive shapes
-        enemy = createPrimitiveEnemy(scene, config, position, playerMesh);
+        var enemy = createPrimitiveEnemy(scene, config, position, playerMesh);
+        
+        console.log(playerMesh);
+        console.log(enemy);
+        // ADDED: Initialize AI behavior for the enemy
+        if (enemy && playerMesh) {
+            console.log("begin");
+            initializeEnemyAI(enemy, playerMesh, scene);
+        }
+        
+        return Promise.resolve(enemy);
     }
-    
-    console.log(playerMesh);
-    console.log(enemy);
-    // ADDED: Initialize AI behavior for the enemy
-    if (enemy && playerMesh) {
-        console.log("begin");
-        initializeEnemyAI(enemy, playerMesh, scene);
-    }
-    
-    return enemy;
 }
 
  
 async function loadEnemyModel(scene, config, position, playerMesh) {
     try {
-        const result = await BABYLON.SceneLoader.ImportMeshAsync("", "", config.modelPath, scene);
+        // Split the path into directory and filename
+        const lastSlash = config.modelPath.lastIndexOf('/');
+        let baseDir = '';
+        let filename = config.modelPath;
+        
+        if (lastSlash !== -1) {
+            baseDir = config.modelPath.substring(0, lastSlash + 1);
+            filename = config.modelPath.substring(lastSlash + 1);
+        }
+        
+        console.log("Loading model - baseDir:", baseDir, "filename:", filename);
+        const result = await BABYLON.SceneLoader.ImportMeshAsync("", baseDir, filename, scene);
         const modelRoot = result.meshes[0];
         
         // Get all geometry meshes
@@ -156,9 +183,12 @@ async function loadEnemyModel(scene, config, position, playerMesh) {
         body.setAngularDamping(config.angularDamping);
         
         // Grounded enemies: set to STATIC motion type (immovable)
-        if (config.isGrounded) {
+    if (config.isGrounded) {
+        const isMeleeChaser = config.name === "Tank" || config.name === "Fast Box";
+        if (!isMeleeChaser) {
             body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
         }
+    }
  
         // 7. Initialize enemy-specific properties
         physicsParent.currentHealth = config.health;
@@ -223,6 +253,13 @@ function createPrimitiveEnemy(scene, config, position, playerMesh) {
             body.applyImpulse(dir.scale(10), enemy.getAbsolutePosition());
         }
     };
+
+        if (config.isGrounded) {
+        const isMeleeChaser = config.name === "Tank" || config.name === "Fast Box";
+        if (!isMeleeChaser) {
+            body.setMotionType(BABYLON.PhysicsMotionType.STATIC);
+        }
+    }
     
     // Store enemy type
     enemy.enemyType = config.name;
